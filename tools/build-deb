@@ -1,0 +1,154 @@
+#!/bin/bash
+
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 2016 Pluribus Networks Inc.
+#
+
+
+PKG_OUTPUT_DIR="$1"
+DEB_PKG_BITS="$2"
+PKG_URL="$3"
+DEB_PKG_VERSION="$4"
+DEB_PKG_REVISION="$5"
+
+if [ "x${DEB_PKG_REVISION}" != "x" ]
+then
+	DEB_PKG_VERSION="${DEB_PKG_VERSION}-${DEB_PKG_REVISION}"
+fi
+
+DEB_PKG_SECTION="base"
+DEB_PKG_PRIORITY="optional"
+DEB_PKG_MAINTAINER="pluribus"
+DEB_PKG_DESCRIPTION="N/A"
+DEB_PKG_URL=`echo $PKG_URL | sed 's/^url=//'`
+DEB_META_DIR="debian"
+BUILD_DIR=build
+PROTO_DIR=${BUILD_DIR}/prototype/`uname -p`
+DEB_CTL_DIR="${PROTO_DIR}/DEBIAN"
+DEB_CONTROL_FILE="${DEB_CTL_DIR}/control"
+rm -rf ${DEB_CTL_DIR}
+
+if [ "$DEB_PKG_BITS" = "32" ]
+then
+	DEB_PKG_ARCHITECTURE="i386"
+else
+	DEB_PKG_ARCHITECTURE="amd64"
+fi
+
+if [ ! -d ${DEB_META_DIR} ]
+then
+	echo "ERROR: The 'debian' directory does not exist. Can't create package."
+	exit 1
+fi
+
+if [ ! -f ${DEB_META_DIR}/pkginfo ]
+then
+	echo "ERROR: Please supply a 'debian/pkginfo' file for package"
+	exit 1
+fi
+
+DEB_PKG_NAME=`/usr/bin/awk -F: '/^Package/ {gsub(/^[[:cntrl:][:space:]]+|[[:cntrl:][:space:]]+$/,"",$2); print $2}' ${DEB_META_DIR}/pkginfo`
+if [ "x${DEB_PKG_NAME}" = "x" ]
+then
+	echo "ERROR: 'Package: <package name>' not specified in pkginfo file"
+	exit 1
+fi
+
+VERSION=`/usr/bin/awk -F: '/^Version/ {gsub(/^[[:cntrl:][:space:]]+|[[:cntrl:][:space:]]+$/,"",$2); print $2}' ${DEB_META_DIR}/pkginfo`
+[ "x${VERSION}" != "x" ] && DEB_PKG_VERSION="$VERSION"
+
+SECTION=`/usr/bin/awk -F: '/^Section/ {gsub(/^[[:cntrl:][:space:]]+|[[:cntrl:][:space:]]+$/,"",$2); print $2}' ${DEB_META_DIR}/pkginfo`
+[ "x${SECTION}" != "x" ] && DEB_PKG_SECTION="$SECTION"
+
+PRIORITY=`/usr/bin/awk -F: '/^Priority/ {gsub(/^[[:cntrl:][:space:]]+|[[:cntrl:][:space:]]+$/,"",$2); print $2}' ${DEB_META_DIR}/pkginfo`
+[ "x${PRIORITY}" != "x" ] && DEB_PKG_PRIORITY="$PRIORITY"
+
+MAINTAINER=`/usr/bin/awk -F: '/^Maintainer/ {gsub(/^[[:cntrl:][:space:]]+|[[:cntrl:][:space:]]+$/,"",$2); print $2}' ${DEB_META_DIR}/pkginfo`
+[ "x${MAINTAINER}" != "x" ] && DEB_PKG_MAINTAINER="$MAINTAINER"
+
+#
+# Generate control file
+#
+mkdir -p $DEB_CTL_DIR
+echo "Package: $DEB_PKG_NAME" > ${DEB_CONTROL_FILE}
+echo "Version: $DEB_PKG_VERSION" >> ${DEB_CONTROL_FILE}
+echo "Maintainer: $DEB_PKG_MAINTAINER" >> ${DEB_CONTROL_FILE}
+echo "Section: $DEB_PKG_SECTION" >> ${DEB_CONTROL_FILE}
+echo "Priority: $DEB_PKG_PRIORITY" >> ${DEB_CONTROL_FILE}
+echo "Architecture: $DEB_PKG_ARCHITECTURE" >> ${DEB_CONTROL_FILE}
+
+if [ "x${DEB_PKG_URL}" != "x" ]
+then
+	echo "Homepage: $DEB_PKG_URL" >> ${DEB_CONTROL_FILE}
+fi
+
+for tag in Depends:depends Pre-Depends:pre-depends Suggests:suggests \
+	Breaks:breaks Conflicts:conflicts Replaces:replaces Provides:provides
+do
+	_OIFS="$IFS"
+	IFS=:
+	set -- $tag
+	IFS="$_OIFS"
+	tagn=$1
+	tagf=$2
+	if [ -f ${DEB_META_DIR}/${tagf} ]
+	then
+		echo "${tagn}: `sed -e 's/#.*$//' -e '/^$/d' ${DEB_META_DIR}/${tagf}`" >> ${DEB_CONTROL_FILE}
+	fi
+done
+
+if [ -f ${DEB_META_DIR}/description ]
+then
+	echo "Description: `sed 's/^/ /' ${DEB_META_DIR}/description`" >> ${DEB_CONTROL_FILE}
+else
+	echo "Description: $DEB_PKG_DESCRIPTION" >> ${DEB_CONTROL_FILE}
+fi
+
+#
+# Copy trigger scripts
+#
+[ -f ${DEB_META_DIR}/preinst ] && cp -a ${DEB_CTL_DIR}/preinst
+[ -f ${DEB_META_DIR}/postinst ] && cp -a ${DEB_CTL_DIR}/postinst
+[ -f ${DEB_META_DIR}/prerm ] && cp -a ${DEB_CTL_DIR}/prerm
+[ -f ${DEB_META_DIR}/postrm ] && cp -a ${DEB_CTL_DIR}/postrm
+
+#
+# Copy copyright file, if any
+#
+if [ -f ${DEB_META_DIR}/copyright ]
+then
+	mkdir -p ${PROTO_DIR}/usr/share/doc/${DEB_PKG_NAME}
+	cp ${DEB_META_DIR}/copyright ${PROTO_DIR}/usr/share/doc/${DEB_PKG_NAME}
+fi
+
+#
+# Delete any lib*.la libtool archive files
+#
+find ${PROTO_DIR} -name "lib*.la" | xargs rm -f
+find ${PROTO_DIR} -name ".lib*.la" | xargs rm -f
+
+#
+# Now generate package
+#
+[ ! -d ${PKG_OUTPUT_DIR} ] && mkdir -p ${PKG_OUTPUT_DIR}
+/usr/bin/fakeroot /usr/bin/dpkg-deb --build ${PROTO_DIR} ${PKG_OUTPUT_DIR}
+

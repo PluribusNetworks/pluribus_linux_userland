@@ -1,0 +1,43 @@
+    This is the Pluribus Userland package build repo for Ubuntu Linux environment
+
+
+Overview
+
+    The Git repository is available at the URL below:
+
+	https://github.com/PluribusNetworks/pluribus_linux_userland.git
+
+    This gate contains build recipies, patches, debian metadata, etc. necessary
+    to download, prep, build, test, package and publish open source software.
+
+    This gate is a derivative of the OpenIndiana Userland repository found at the
+    URL below:
+
+        https://github.com/OpenIndiana/oi-userland/
+
+    This repo has been heavily modified to build DEB packages in Ubuntu.
+
+Getting the Bits
+
+    You can clone the git repo:
+
+      $ git clone https://github.com/PluribusNetworks/pluribus_linux_userland.git pn_linux
+
+    This will create a replica of the various pieces that are checked into the
+    source code management system.
+
+Building the Bits.
+
+  Building one component
+
+        $ cd (your-workspace)/components/(component-name)
+        $ make publish
+
+     This will create a deb package inside (your-workspace)/`uname -p`/repo
+
+  Building all components
+
+        $ cd (your-workspace)
+        $ make publish
+
+     This will build all components one by one
