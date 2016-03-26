@@ -128,8 +128,8 @@ Adding new Component to the tree.
      The components/inline-helloworld sample is provided as an example of this. The
      source code is inside components/inline-helloworld/helloworld.
 
-     *IMPORTANT NOTE*
-     ----------------
+     *IMPORTANT NOTES*
+     -----------------
      The build system in this gate assumes a GNU Autoconf based setup and does a staged
      build. That is the build does not happen inside the source directory. Rather, a
      separate build directory is created and configure is run from within that directory.
@@ -143,3 +143,10 @@ Adding new Component to the tree.
      Again components/inline-helloworld sample shows an example of this. It has a simple
      configure script that creates a Makefile and creates a symlink for the single source
      file in the build dir.
+
+     In addition, your Makefile[s] *MUST* support the DESTDIR=(install dir) mechanism
+     since "make install" is run with a specific DESTDIR to copy the build output there
+     for packaging, rather than trying to install into the build machine's system locations.
+     You can read more about DESTDIR here:
+     http://www.gnu.org/prep/standards/html_node/DESTDIR.html
+
