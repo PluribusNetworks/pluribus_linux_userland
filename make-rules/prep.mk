@@ -42,6 +42,7 @@ prep::	$(SOURCE_DIR)/.prep
 clean::
 	$(PRE_CLEAN_ACTION)
 	$(RM) -r $(CLEAN_PATHS)
+	$(RM) $(SOURCE_DIR)/.prep
 
 clobber::	clean
 	$(RM) -r $(CLOBBER_PATHS)

@@ -20,7 +20,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2016 Pluribus Networks Inc.
+# Copyright 2016 Pluribus Networks Inc. All rights reserved.
 #
 
 
@@ -40,19 +40,9 @@ DEB_PKG_PRIORITY="optional"
 DEB_PKG_MAINTAINER="pluribus"
 DEB_PKG_DESCRIPTION="N/A"
 DEB_PKG_URL=`echo $PKG_URL | sed 's/^url=//'`
-DEB_META_DIR="debian"
-BUILD_DIR=build
+DEB_DIR=`pwd`/debian
+BUILD_DIR=`pwd`/build
 PROTO_DIR=${BUILD_DIR}/prototype/`uname -p`
-DEB_CTL_DIR="${PROTO_DIR}/DEBIAN"
-DEB_CONTROL_FILE="${DEB_CTL_DIR}/control"
-rm -rf ${DEB_CTL_DIR}
-
-if [ "$DEB_PKG_BITS" = "32" ]
-then
-	DEB_PKG_ARCHITECTURE="i386"
-else
-	DEB_PKG_ARCHITECTURE="amd64"
-fi
 
 if [ ! -d ${DEB_META_DIR} ]
 then
@@ -60,95 +50,279 @@ then
 	exit 1
 fi
 
-if [ ! -f ${DEB_META_DIR}/pkginfo ]
-then
-	echo "ERROR: Please supply a 'debian/pkginfo' file for package"
-	exit 1
-fi
-
-DEB_PKG_NAME=`/usr/bin/awk -F: '/^Package/ {gsub(/^[[:cntrl:][:space:]]+|[[:cntrl:][:space:]]+$/,"",$2); print $2}' ${DEB_META_DIR}/pkginfo`
-if [ "x${DEB_PKG_NAME}" = "x" ]
-then
-	echo "ERROR: 'Package: <package name>' not specified in pkginfo file"
-	exit 1
-fi
-
-VERSION=`/usr/bin/awk -F: '/^Version/ {gsub(/^[[:cntrl:][:space:]]+|[[:cntrl:][:space:]]+$/,"",$2); print $2}' ${DEB_META_DIR}/pkginfo`
-[ "x${VERSION}" != "x" ] && DEB_PKG_VERSION="$VERSION"
-
-SECTION=`/usr/bin/awk -F: '/^Section/ {gsub(/^[[:cntrl:][:space:]]+|[[:cntrl:][:space:]]+$/,"",$2); print $2}' ${DEB_META_DIR}/pkginfo`
-[ "x${SECTION}" != "x" ] && DEB_PKG_SECTION="$SECTION"
-
-PRIORITY=`/usr/bin/awk -F: '/^Priority/ {gsub(/^[[:cntrl:][:space:]]+|[[:cntrl:][:space:]]+$/,"",$2); print $2}' ${DEB_META_DIR}/pkginfo`
-[ "x${PRIORITY}" != "x" ] && DEB_PKG_PRIORITY="$PRIORITY"
-
-MAINTAINER=`/usr/bin/awk -F: '/^Maintainer/ {gsub(/^[[:cntrl:][:space:]]+|[[:cntrl:][:space:]]+$/,"",$2); print $2}' ${DEB_META_DIR}/pkginfo`
-[ "x${MAINTAINER}" != "x" ] && DEB_PKG_MAINTAINER="$MAINTAINER"
-
-#
-# Generate control file
-#
-mkdir -p $DEB_CTL_DIR
-echo "Package: $DEB_PKG_NAME" > ${DEB_CONTROL_FILE}
-echo "Version: $DEB_PKG_VERSION" >> ${DEB_CONTROL_FILE}
-echo "Maintainer: $DEB_PKG_MAINTAINER" >> ${DEB_CONTROL_FILE}
-echo "Section: $DEB_PKG_SECTION" >> ${DEB_CONTROL_FILE}
-echo "Priority: $DEB_PKG_PRIORITY" >> ${DEB_CONTROL_FILE}
-echo "Architecture: $DEB_PKG_ARCHITECTURE" >> ${DEB_CONTROL_FILE}
-
-if [ "x${DEB_PKG_URL}" != "x" ]
-then
-	echo "Homepage: $DEB_PKG_URL" >> ${DEB_CONTROL_FILE}
-fi
-
-for tag in Depends:depends Pre-Depends:pre-depends Suggests:suggests \
-	Breaks:breaks Conflicts:conflicts Replaces:replaces Provides:provides
+cd debian
+NO_FILE_LIST=""
+NO_FILES=0
+BASE_PKG=""
+for pkg in *
 do
-	_OIFS="$IFS"
-	IFS=:
-	set -- $tag
-	IFS="$_OIFS"
-	tagn=$1
-	tagf=$2
-	if [ -f ${DEB_META_DIR}/${tagf} ]
+	if [ ! -f ${pkg}/files ]
 	then
-		echo "${tagn}: `sed -e 's/#.*$//' -e '/^$/d' ${DEB_META_DIR}/${tagf}`" >> ${DEB_CONTROL_FILE}
+		NO_FILE_LIST="${NO_FILE_LIST} ${pkg}"
+		NO_FILES=$((NO_FILES + 1))
+	else
+		cp ${pkg}/files ${BUILD_DIR}/${pkg}.files
+	fi
+	if [ -f ${pkg}/basepkg ]
+	then
+		if [ "x${BASE_PKG}" = "x" ]
+		then
+			BASE_PKG=$pkg
+		else
+			echo "ERROR: Duplicate 'basepkg' specified for $pkg"
+			echo "ERROR: Previous 'basepkg' is $BASE_PKG"
+			exit 1
+		fi
 	fi
 done
+cd ..
 
-if [ -f ${DEB_META_DIR}/description ]
+if [ $NO_FILES -gt 1 ]
 then
-	echo "Description: `sed 's/^/ /' ${DEB_META_DIR}/description`" >> ${DEB_CONTROL_FILE}
-else
-	echo "Description: $DEB_PKG_DESCRIPTION" >> ${DEB_CONTROL_FILE}
+	echo "ERROR: Multiple packages specified but missing file lists for:"
+	echo "ERROR: $NO_FILE_LIST"
+	exit 1
+
+elif [ $NO_FILES -eq 1 ]
+then
+	echo "WARNING: Missing file list. Generating default file list for single package."
+	pkg=`echo debian/*`
+	pkg=`basename $pkg`
+	(cd $PROTO_DIR; find *) > ${BUILD_DIR}/${pkg}.files
 fi
 
-#
-# Copy trigger scripts
-#
-[ -f ${DEB_META_DIR}/preinst ] && cp -a ${DEB_CTL_DIR}/preinst
-[ -f ${DEB_META_DIR}/postinst ] && cp -a ${DEB_CTL_DIR}/postinst
-[ -f ${DEB_META_DIR}/prerm ] && cp -a ${DEB_CTL_DIR}/prerm
-[ -f ${DEB_META_DIR}/postrm ] && cp -a ${DEB_CTL_DIR}/postrm
+for pkg in debian/*
+do
+	DEB_PKG_NAME=`basename $pkg`
+	PKG_PROTO_DIR=${BUILD_DIR}/${DEB_PKG_NAME}
+	DEB_META_DIR=${DEB_DIR}/${DEB_PKG_NAME}
+	DEB_CTL_DIR=${PKG_PROTO_DIR}/DEBIAN
+	DEB_CONTROL_FILE=${DEB_CTL_DIR}/control
+	rm -rf ${PKG_PROTO_DIR}
+	mkdir -p ${DEB_CTL_DIR}
 
-#
-# Copy copyright file, if any
-#
-if [ -f ${DEB_META_DIR}/copyright ]
-then
-	mkdir -p ${PROTO_DIR}/usr/share/doc/${DEB_PKG_NAME}
-	cp ${DEB_META_DIR}/copyright ${PROTO_DIR}/usr/share/doc/${DEB_PKG_NAME}
-fi
+	echo "** Processing package ${DEB_PKG_NAME} ..."
+	if [ "$DEB_PKG_BITS" = "32" ]
+	then
+		DEB_PKG_ARCHITECTURE="i386"
+	else
+		DEB_PKG_ARCHITECTURE="amd64"
+	fi
 
-#
-# Delete any lib*.la libtool archive files
-#
-find ${PROTO_DIR} -name "lib*.la" | xargs rm -f
-find ${PROTO_DIR} -name ".lib*.la" | xargs rm -f
+	if [ ! -f ${DEB_META_DIR}/pkginfo ]
+	then
+		echo "ERROR: Please supply a 'debian/pkginfo' file for package"
+		echo "ERROR: At the minimum it should have a 'Section: <section>' directive"
+		exit 1
+	fi
 
-#
-# Now generate package
-#
-[ ! -d ${PKG_OUTPUT_DIR} ] && mkdir -p ${PKG_OUTPUT_DIR}
-/usr/bin/fakeroot /usr/bin/dpkg-deb --build ${PROTO_DIR} ${PKG_OUTPUT_DIR}
+	VERSION=`/usr/bin/awk -F: '/^Version/ {gsub(/^[[:cntrl:][:space:]]+|[[:cntrl:][:space:]]+$/,"",$2); print $2}' ${DEB_META_DIR}/pkginfo`
+	[ "x${VERSION}" != "x" ] && DEB_PKG_VERSION="$VERSION"
+
+	SECTION=`/usr/bin/awk -F: '/^Section/ {gsub(/^[[:cntrl:][:space:]]+|[[:cntrl:][:space:]]+$/,"",$2); print $2}' ${DEB_META_DIR}/pkginfo`
+	[ "x${SECTION}" != "x" ] && DEB_PKG_SECTION="$SECTION"
+
+	PRIORITY=`/usr/bin/awk -F: '/^Priority/ {gsub(/^[[:cntrl:][:space:]]+|[[:cntrl:][:space:]]+$/,"",$2); print $2}' ${DEB_META_DIR}/pkginfo`
+	[ "x${PRIORITY}" != "x" ] && DEB_PKG_PRIORITY="$PRIORITY"
+
+	MAINTAINER=`/usr/bin/awk -F: '/^Maintainer/ {gsub(/^[[:cntrl:][:space:]]+|[[:cntrl:][:space:]]+$/,"",$2); print $2}' ${DEB_META_DIR}/pkginfo`
+	[ "x${MAINTAINER}" != "x" ] && DEB_PKG_MAINTAINER="$MAINTAINER"
+
+	if [ $DEB_PKG_NAME = lib* -a $SECTION != lib* ]
+	then
+		echo "ERROR: Libraries should be categorized into either 'libs' or 'libdevel'"
+		echo "ERROR: sections"
+		exit 1
+	fi
+
+	echo "   Building control file ..."
+	#
+	# Generate control file
+	#
+	echo "Package: $DEB_PKG_NAME" > ${DEB_CONTROL_FILE}
+	echo "Version: $DEB_PKG_VERSION" >> ${DEB_CONTROL_FILE}
+	echo "Maintainer: $DEB_PKG_MAINTAINER" >> ${DEB_CONTROL_FILE}
+	echo "Section: $DEB_PKG_SECTION" >> ${DEB_CONTROL_FILE}
+	echo "Priority: $DEB_PKG_PRIORITY" >> ${DEB_CONTROL_FILE}
+	echo "Architecture: $DEB_PKG_ARCHITECTURE" >> ${DEB_CONTROL_FILE}
+
+	if [ "x${DEB_PKG_URL}" != "x" ]
+	then
+		echo "Homepage: $DEB_PKG_URL" >> ${DEB_CONTROL_FILE}
+	fi
+
+	#====================================================================================
+	# Handle depends specification.
+	# Compute and insert auto dependencies to existing depends file (if any).
+	#
+	PKG_DEPENDS=${BUILD_DIR}/${DEB_PKG_NAME}.depends
+	rm -f ${PKG_DEPENDS}
+	libc_dep=0
+	if [ -f ${DEB_META_DIR}/depends ]
+	then
+		dep=`sed -e 's/#.*$//' \
+                         -e '/^$/d' \
+                         -e 's/\[VERSION\]/${DEB_PKG_VERSION}/' ${DEB_META_DIR}/depends`
+		printf 'Depends: %s' "$dep" >> ${PKG_DEPENDS}
+		grep "libc" ${PKG_DEPENDS} > /dev/null 2>&1
+		libc_dep=$?
+	fi
+
+	if [ "x${BASE_PKG}" != "x" ] && [ "$DEB_PKG_NAME" != "$BASE_PKG" ]
+	then
+		if [ ! -f ${PKG_DEPENDS} ]
+		then
+			printf '%s' "Depends: ${BASE_PKG} (= ${DEB_PKG_VERSION})" >> ${PKG_DEPENDS}
+		else
+			printf '%s' ", ${BASE_PKG} (= ${DEB_PKG_VERSION})" >> ${PKG_DEPENDS}
+		fi
+	fi
+
+	# For libraries insert libc dependency if not already present
+	if [ $libc_dep -eq 0 ] && ([ "$DEB_PKG_SECTION" = "libs" ] || [ "$DEB_PKG_SECTION" = "libdevel" ] )
+	then
+		# Version of libc on the build machine. It is what we are linking with.
+		libc=libc
+		libc_vers=`dpkg-query --showformat='${Version}' --show libc:${DEB_PKG_ARCHITECTURE} 2>/dev/null`
+		if [ $? -ne 0 ]
+		then
+			libc=libc6
+			libc_vers=`dpkg-query --showformat='${Version}' --show libc6:${DEB_PKG_ARCHITECTURE}`
+			if [ $? -ne 0 ]
+			then
+				echo "ERROR: FATAL: Unable to fetch libc version on system"
+				exit 1
+			fi
+		fi
+		echo "   Adding libc dependency:  ${libc} (>= ${libc_vers})"
+		if [ ! -f ${PKG_DEPENDS} ]
+		then
+			printf '%s'  "Depends: ${libc} (>= ${libc_vers})" >> ${PKG_DEPENDS}
+		else
+			printf '%s'  ", ${libc} (>= ${libc_vers})" >> ${PKG_DEPENDS}
+		fi
+	fi
+
+	#
+	# Process transitive dependencies in binaries by looking at the direct dynamic dependencies
+	# inside the ELF object.
+	#
+	for path in `cat ${BUILD_DIR}/${DEB_PKG_NAME}.files`
+	do
+		fpath=${PROTO_DIR}/${path}
+		arch=$DEB_PKG_ARCHITECTURE
+		file ${fpath} | grep -w "ELF" > /dev/null
+		[ $? -ne 0 ] && continue
+		for lib in `readelf -d $fpath | grep NEEDED | grep "Shared library" | tr '[]' '@' | cut -d@ -f2`
+		do
+			# Paranoia
+			lib=`basename $lib`
+			pkgdep=""
+			dpkg -S $lib | grep ":${arch}" | egrep -v "libc:|libc6:" | grep "/${lib}\$" | cut -d: -f1 > ${BUILD_DIR}/.tdep
+			if [ $? -eq 0 ]
+			then
+				for dep_pkg in `cat ${BUILD_DIR}/.tdep`
+				do
+					pkgdep=$dep_pkg
+				done
+			fi
+			[ "x${pkgdep}" = "x" ] && continue
+			pkgdep_vers=`dpkg-query --showformat='${Version}' \
+						--show ${pkgdep}:${arch}`
+			[ $? -ne 0 ] && continue
+
+			if [ ! -f ${PKG_DEPENDS} ]
+			then
+				echo "   Adding transitive dependency:  ${pkgdep} (>= ${pkgdep_vers})"
+				printf '%s'  "Depends: ${pkgdep} (>= ${pkgdep_vers})" >> ${PKG_DEPENDS}
+			else
+				#
+				# Skip if dependency already present
+				#
+				grep -w "${pkgdep}" ${PKG_DEPENDS} > /dev/null 2>&1
+				[ $? -eq 0 ] && continue
+				echo "   Adding transitive dependency:  ${pkgdep} (>= ${pkgdep_vers})"
+				printf '%s'  ", ${pkgdep} (>= ${pkgdep_vers})" >> ${PKG_DEPENDS}
+			fi
+		done
+	done
+
+	if [ -f ${PKG_DEPENDS} ]
+	then
+		dep=`cat ${PKG_DEPENDS}`
+		printf '%s\n' "$dep" >> ${DEB_CONTROL_FILE}
+	fi
+	#
+	# End of depends handling
+	#====================================================================================
+
+	#
+	# Handle other specs
+	#
+	for tag in Pre-Depends:pre-depends Suggests:suggests Breaks:breaks \
+		Conflicts:conflicts Replaces:replaces Provides:provides
+	do
+		_OIFS="$IFS"
+		IFS=:
+		set -- $tag
+		IFS="$_OIFS"
+		tagn=$1
+		tagf=$2
+		if [ -f ${DEB_META_DIR}/${tagf} ]
+		then
+			echo "${tagn}: `sed -e 's/#.*$//' \
+					    -e '/^$/d' \
+					    -e 's/\[VERSION\]/${DEB_PKG_VERSION}/' \
+					    ${DEB_META_DIR}/${tagf}`" >> ${DEB_CONTROL_FILE}
+		fi
+	done
+
+	echo "   Adding description ..."
+	if [ -f ${DEB_META_DIR}/description ]
+	then
+		echo "Description: `sed -e 's/#.*$//' \
+					-e '/^$/d' \
+					-e 's/\[VERSION\]/${DEB_PKG_VERSION}/' \
+					-e 's/^/ /' \
+					${DEB_META_DIR}/description`" >> ${DEB_CONTROL_FILE}
+	else
+		echo "Description: $DEB_PKG_DESCRIPTION" >> ${DEB_CONTROL_FILE}
+	fi
+
+	echo "   Adding triggers ..."
+	#
+	# Copy trigger scripts
+	#
+	[ -f ${DEB_META_DIR}/preinst ] && cp -a ${DEB_CTL_DIR}/preinst
+	[ -f ${DEB_META_DIR}/postinst ] && cp -a ${DEB_CTL_DIR}/postinst
+	[ -f ${DEB_META_DIR}/prerm ] && cp -a ${DEB_CTL_DIR}/prerm
+	[ -f ${DEB_META_DIR}/postrm ] && cp -a ${DEB_CTL_DIR}/postrm
+
+	#
+	# Copy copyright file, if any
+	#
+	if [ -f ${DEB_META_DIR}/copyright ]
+	then
+		mkdir -p ${PKG_PROTO_DIR}/usr/share/doc/${DEB_PKG_NAME}
+		cp ${DEB_META_DIR}/copyright ${PKG_PROTO_DIR}/usr/share/doc/${DEB_PKG_NAME}
+	fi
+
+	echo "   Copying files to staging area ..."
+	#
+	# Copy files for package
+	#
+	rsync -rlptDK --files-from=${BUILD_DIR}/${DEB_PKG_NAME}.files ${PROTO_DIR} ${PKG_PROTO_DIR}
+
+	#
+	# Now generate package
+	#
+	echo "   Generating package ${DEB_PKG_NAME} ..."
+	[ ! -d ${PKG_OUTPUT_DIR} ] && mkdir -p ${PKG_OUTPUT_DIR}
+	/usr/bin/fakeroot /usr/bin/dpkg-deb --build ${PKG_PROTO_DIR} ${PKG_OUTPUT_DIR}
+
+	#
+	# Clean up pkg proto if everything was okay. This avoids space wasteage.
+	#
+	[ $? -eq 0 ] && rm -rf ${PKG_PROTO_DIR}
+done
 
