@@ -41,3 +41,105 @@ Building the Bits.
         $ make publish
 
      This will build all components one by one
+
+Adding new Component to the tree.
+
+  These guidelines should help you to quickly add a new package build under compoments.
+  In general, adding a new package consists of the following high-level steps:
+
+  1) Create a directory under components for the software. This directory need not have
+     the same name as the package name. That is handled later.
+  2) Create the Makefile, the debian directory (with all the package metadata).
+  3) If it is a source download from remote repo, then a patches directory might be
+     required to hold any local patches.
+  4) If it is a software maintained in this tree, add the source tree within the
+     component directory.
+
+  Now lets look at the details:
+
+  1) When adding a component the first thing is the Makefile that specifies how to
+     build the component. The build system has intelligence to download, extract, patch
+     and build.
+     The Makefile parameters control all aspects of the build. Please look at existing
+     sample components: compoments/tmux and components/liblzo to see how the Makefile is
+     structured.
+     For cases where the source patches need to be applied after download, you make look
+     at the following project to see how the patches and Makefile are laid out:
+     https://github.com/PluribusNetworks/pluribus_userland/blob/master/components/gdb/Makefile
+     https://github.com/PluribusNetworks/pluribus_userland/tree/master/components/gdb/patches
+
+     The Makefile uses COMPONENT_ARCHIVE_HASH to verify the sha2 digest with the downloaded
+     archive tarball. When adding the first time a digest will not be present. Either use
+     the sha256sum utility or just add an arbitrary hash value. When verify fails after
+     download, it will print the computed digest value which can then be pasted into the
+     Makefile.
+
+     Typically DEFAULT_BUILD is set to the current booted platform architecture build.
+     If you want to do both 32-bit and 64-bit builds then you need to ensure than all
+     build dependencies are available for both the architectures. In that case use the
+     $(BUILD_32_and_64) macro instead of $(DEFAULT_BUILD).
+
+  2) The "debian" directory contains most of the package metadata required to build DEB
+     packages. Inside "debian" add one or more sub-directories with the actual package
+     names that you want to generate. Each sub-directory contains various metadata files.
+
+     You can look at components/liblzo/debian. It specifies two packages: liblzo and
+     liblzo-dev (the development package). Typically you need to create a pkginfo file that
+     contains at least the "Section: (section name)" parameter. Debian has guidelines and
+     standard section names. Please refer to the following link for details:
+     https://www.debian.org/doc/debian-policy/ch-archive.html#s-subsections
+
+     Other items in pkginfo can be Version (to override version in Makefile), Priority,
+     Maintainer.
+
+     Apart from pkginfo, you can specify a depends file to list dependencies in debian
+     format. Apart from listed dependencies soe dependencies are added automatically.
+     For libraries (Sections "libs" and "libdevel") a libc6 dependency is added. For
+     all binaries, readelf is used to analyze the runtime link dependencies and dependencies
+     on packages supplying those libraries are automatically generated, if not already
+     specified by user.
+
+     Components that generate multiple packages may need internal dependencies between
+     them. One common dependency is the pkgname-dev depending on pkgname package. That
+     can be auto-generated. In the liblzo example, liblzo-dev depends on liblzo. So the
+     components/liblzo/debian/liblzo/basepkg empty file is present to indicate liblzo
+     as a base package. All additional packages generated from this component automatically
+     specify a dependency on this base package with the correct version.
+     Other internal dependencies need to specified by user. The [VERSION] tag used in
+     the depends files is replaced with the package version to make it easy to generate
+     versioned dependencies between packages from the same component build.
+     See the components/tmux example. The depends file there only specifies the following
+     dependency: libc6 (>= 2.14). However, once the package is built you will find that
+     additional dependencies on libevent and libtinfo5 packages have automatically been
+     generated because tmux uses those libraries.
+
+     Other files within debian/pkgname can be pre-depends, sugests, breaks, conflicts,
+     repalces, provides. These specify the corresponding control file parameters. See
+     the Debian manuals for more details on these.
+
+  3) See point #1 above.
+
+  4) It is possible to maintain the entire component source tree within the
+     component/component-name directory. This will build from the version managed source
+     tree within this gate rather than downloading from somewhere else. For that You
+     need to omit COMPONENT_ARCHIVE, COMPONENT_ARCHIVE_HASH and COMPONENT_ARCHIVE_URL
+     parameters in the Makefile and just point COMPONENT_SRC to the source tree.
+
+     The components/inline-helloworld sample is provided as an example of this. The
+     source code is inside components/inline-helloworld/helloworld.
+
+     *IMPORTANT NOTE*
+     ----------------
+     The build system in this gate assumes a GNU Autoconf based setup and does a staged
+     build. That is the build does not happen inside the source directory. Rather, a
+     separate build directory is created and configure is run from within that directory.
+     GNU Autoconf supports this operation mode and creates Makefiles inside the build
+     directory and creates symbolic links for all source files from the build directory
+     to the original source tree.
+
+     If you are not using GNU Autoconf then some small kludge is needed. Supply a script
+     called configure at the top-level of your source tree. It can simply copy the entire
+     source tree into the build directory.
+     Again components/inline-helloworld sample shows an example of this. It has a simple
+     configure script that creates a Makefile and creates a symlink for the single source
+     file in the build dir.
