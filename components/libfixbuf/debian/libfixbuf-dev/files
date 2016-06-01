@@ -1,0 +1,6 @@
+usr/include/fixbuf/autoinc.h
+usr/include/fixbuf/private.h
+usr/include/fixbuf/public.h
+usr/lib/x86_64-linux-gnu/libfixbuf.a
+usr/lib/x86_64-linux-gnu/libfixbuf.la
+usr/lib/x86_64-linux-gnu/pkgconfig/libfixbuf.pc

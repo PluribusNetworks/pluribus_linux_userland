@@ -1,0 +1,6 @@
+usr/bin/log4c-config
+etc/log4crc.sample
+usr/lib/x86_64-linux-gnu/liblog4c.so
+usr/lib/x86_64-linux-gnu/liblog4c.so.3
+usr/lib/x86_64-linux-gnu/liblog4c.so.3.3.1
+usr/share/man/man1/log4c-config.1
