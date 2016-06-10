@@ -128,7 +128,7 @@ do
 	MAINTAINER=`/usr/bin/awk -F: '/^Maintainer/ {gsub(/^[[:cntrl:][:space:]]+|[[:cntrl:][:space:]]+$/,"",$2); print $2}' ${DEB_META_DIR}/pkginfo`
 	[ "x${MAINTAINER}" != "x" ] && DEB_PKG_MAINTAINER="$MAINTAINER"
 
-	if [ $DEB_PKG_NAME = lib* -a $SECTION != lib* ]
+	if [[ $DEB_PKG_NAME == lib* && $SECTION != lib* ]]
 	then
 		echo "ERROR: Libraries should be categorized into either 'libs' or 'libdevel'"
 		echo "ERROR: sections"
