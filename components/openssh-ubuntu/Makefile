@@ -40,7 +40,8 @@ install:
 
 
 clean:
-	rm -rf $(COMPONENT_ORIG_DIR)
+	rm -rf $(COMPONENT_ORIG_DIR); \
+	rm -f *.deb *.changes *.udeb
 
 distclean: clean
 	for f in $(ORIG_SRC) $(DEBIAN_SRC) $(DEBIAN_DSC); do rm -f $$f; done
