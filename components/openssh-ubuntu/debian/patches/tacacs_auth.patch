@@ -1,0 +1,143 @@
+--- openssh-6.6p1.orig/auth-pam.c	2016-06-30 00:05:23.377135663 -0700
++++ openssh-6.6p1/auth-pam.c	2016-06-30 00:06:00.116550614 -0700
+@@ -778,12 +778,11 @@
+ 				    strlen(**prompts));
+ 				free(**prompts);
+ 				**prompts = NULL;
+ 			}
+ 			if (type == PAM_SUCCESS) {
+-				if (!sshpam_authctxt->valid ||
+-				    (sshpam_authctxt->pw->pw_uid == 0 &&
++				if ((sshpam_authctxt->pw->pw_uid == 0 &&
+ 				    options.permit_root_login != PERMIT_YES))
+ 					fatal("Internal error: PAM auth "
+ 					    "succeeded when it should have "
+ 					    "failed");
+ 				import_environments(&buffer);
+@@ -829,13 +828,12 @@
+ 	if (num != 1) {
+ 		error("PAM: expected one response, got %u", num);
+ 		return (-1);
+ 	}
+ 	buffer_init(&buffer);
+-	if (sshpam_authctxt->valid &&
+-	    (sshpam_authctxt->pw->pw_uid != 0 ||
+-	    options.permit_root_login == PERMIT_YES))
++	if (sshpam_authctxt->pw->pw_uid != 0 ||
++	    options.permit_root_login == PERMIT_YES)
+ 		buffer_put_cstring(&buffer, *resp);
+ 	else
+ 		buffer_put_cstring(&buffer, badpw);
+ 	if (ssh_msg_send(ctxt->pam_psock, PAM_AUTHTOK, &buffer) == -1) {
+ 		buffer_free(&buffer);
+@@ -1191,25 +1189,48 @@
+ 	/*
+ 	 * If the user logging in is invalid, or is root but is not permitted
+ 	 * by PermitRootLogin, use an invalid password to prevent leaking
+ 	 * information via timing (eg if the PAM config has a delay on fail).
+ 	 */
+-	if (!authctxt->valid || (authctxt->pw->pw_uid == 0 &&
+-	    options.permit_root_login != PERMIT_YES))
++	if (authctxt->pw->pw_uid == 0 &&
++	    options.permit_root_login != PERMIT_YES)
+ 		sshpam_password = badpw;
+ 
+ 	sshpam_err = pam_set_item(sshpam_handle, PAM_CONV,
+ 	    (const void *)&passwd_conv);
+ 	if (sshpam_err != PAM_SUCCESS)
+ 		fatal("PAM: %s: failed to set PAM_CONV: %s", __func__,
+ 		    pam_strerror(sshpam_handle, sshpam_err));
+ 
+ 	sshpam_err = pam_authenticate(sshpam_handle, flags);
+ 	sshpam_password = NULL;
+-	if (sshpam_err == PAM_SUCCESS && authctxt->valid) {
++	if (sshpam_err == PAM_SUCCESS) {
++		struct passwd *fpw, *pw;
+ 		debug("PAM: password authentication accepted for %.100s",
+ 		    authctxt->user);
++
++		/*
++		 * At this point re-probe user that was not found earlier
++		 * if this is fakepw().
++		 */
++		fpw = fakepw();
++		pw = authctxt->pw;
++		if (!authctxt->valid &&
++		    strcmp(pw->pw_name, fpw->pw_name) == 0 &&
++		    strcmp(pw->pw_gecos, fpw->pw_gecos) == 0 &&
++		    strcmp(pw->pw_shell, fpw->pw_shell) == 0) {
++			debug("Re-attempting user check");
++			authctxt->pw = getpwnamallow(authctxt->user);
++			if (authctxt->pw == NULL) {
++				authctxt->pw = pw;
++				debug("User %s not found even after PAM auth.",
++				    authctxt->user);
++			} else {
++				debug("User record valid after authentication");
++				authctxt->valid = 1;
++			}
++		}
+ 		return 1;
+ 	} else {
+ 		debug("PAM: password authentication failed for %.100s: %s",
+ 		    authctxt->valid ? authctxt->user : "an illegal user",
+ 		    pam_strerror(sshpam_handle, sshpam_err));
+--- openssh-6.6p1.orig/auth-passwd.c	2016-06-30 00:05:32.632988261 -0700
++++ openssh-6.6p1/auth-passwd.c	2016-06-30 00:06:00.116550614 -0700
+@@ -79,11 +79,11 @@
+  */
+ int
+ auth_password(Authctxt *authctxt, const char *password)
+ {
+ 	struct passwd * pw = authctxt->pw;
+-	int result, ok = authctxt->valid;
++	int result, ok = 1;
+ #if defined(USE_SHADOW) && defined(HAS_SHADOW_EXPIRE)
+ 	static int expire_checked = 0;
+ #endif
+ 
+ #ifndef HAVE_CYGWIN
+@@ -95,25 +95,28 @@
+ 
+ #ifdef KRB5
+ 	if (options.kerberos_authentication == 1) {
+ 		int ret = auth_krb5_password(authctxt, password);
+ 		if (ret == 1 || ret == 0)
+-			return ret && ok;
++			return ret && ok && authctxt->valid;
+ 		/* Fall back to ordinary passwd authentication. */
+ 	}
+ #endif
+ #ifdef HAVE_CYGWIN
+ 	{
+ 		HANDLE hToken = cygwin_logon_user(pw, password);
+ 
+ 		if (hToken == INVALID_HANDLE_VALUE)
+ 			return 0;
+ 		cygwin_set_impersonation_token(hToken);
+-		return ok;
++		return ok && authctxt->valid;
+ 	}
+ #endif
+ #ifdef USE_PAM
++	/*
++	 * Ignore authctxt->valid for PAM. We will re-probe user.
++	 */
+ 	if (options.use_pam)
+ 		return (sshpam_auth_passwd(authctxt, password) && ok);
+ #endif
+ #if defined(USE_SHADOW) && defined(HAS_SHADOW_EXPIRE)
+ 	if (!expire_checked) {
+@@ -123,11 +126,11 @@
+ 	}
+ #endif
+ 	result = sys_auth_passwd(authctxt, password);
+ 	if (authctxt->force_pwchange)
+ 		disable_forwarding();
+-	return (result && ok);
++	return (result && ok && authctxt->valid);
+ }
+ 
+ #ifdef BSD_AUTH
+ static void
+ warn_expiry(Authctxt *authctxt, auth_session_t *as)

@@ -1,0 +1,10 @@
+openssh (1:6.6p1-2ubuntu2.7-pluribus1) trusty-security; urgency=medium
+
+  * Fix authentication with TACACS+ via PAM when the TACACS server does not
+    authorize before authentication
+    - PAM is called even when the user cannot be found initially via
+      getpwnam(). If PAM authenticates successfully then getpwnam() is
+      called again. A success at this point allows the session through.
+
+ -- Moinak Ghosh <moinak.ghosh@pluribusnetworks.com>  Thu, 30 Jun 2016 12:27:30 +0530
+
