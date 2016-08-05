@@ -1,0 +1,105 @@
+diff -u -r dpkg-1.17.5ubuntu5.6.orig/src/archives.c dpkg-1.17.5ubuntu5.6/src/archives.c
+--- dpkg-1.17.5ubuntu5.6.orig/src/archives.c	2013-12-09 22:15:02.000000000 -0800
++++ dpkg-1.17.5ubuntu5.6/src/archives.c	2016-08-05 06:40:19.010052586 -0700
+@@ -1055,6 +1055,9 @@
+     } else {
+       strcpy(oldhash, EMPTYHASHFLAG);
+     }
++  } else if (f_skipunchanged && S_ISREG(stab.st_mode) &&
++      !(nifd->namenode->flags & (fnnf_new_conff | fnnf_old_conff))) {
++    md5hash(tc->pkg, oldhash, fnamevb.buf);
+   }
+ 
+   if (refcounting && !fc_overwrite) {
+@@ -1158,6 +1161,22 @@
+ 
+   if (ti->type == tar_filetype_file || ti->type == tar_filetype_hardlink ||
+       ti->type == tar_filetype_symlink) {
++    if (f_skipunchanged) {
++      if (S_ISREG(stab.st_mode) && 
++          ti->type == tar_filetype_file &&
++          !(nifd->namenode->flags & (fnnf_new_conff | fnnf_old_conff))) {
++        /*
++         * If the new file is identical to the old one do not install the
++         * new copy.
++         * This helps when we are updating a snapshot of a COW FS like
++         * Btrfs. It avoids duplication and saves some disk space.
++         */
++        if (strcmp(oldhash, nifd->namenode->newhash) == 0 && ti->size == stab.st_size) {
++          debug(dbg_eachfiledetail, "tarobject done and installation skipped");
++          return 0;
++        }
++      }
++    }
+     nifd->namenode->flags |= fnnf_deferred_rename;
+ 
+     debug(dbg_eachfiledetail, "tarobject done and installation deferred");
+diff -u -r dpkg-1.17.5ubuntu5.6.orig/src/main.c dpkg-1.17.5ubuntu5.6/src/main.c
+--- dpkg-1.17.5ubuntu5.6.orig/src/main.c	2014-01-16 15:01:36.000000000 -0800
++++ dpkg-1.17.5ubuntu5.6/src/main.c	2016-08-05 07:08:39.091967903 -0700
+@@ -153,6 +153,7 @@
+ "  -E|--skip-same-version     Skip packages whose same version is installed.\n"
+ "  -G|--refuse-downgrade      Skip packages with earlier version than installed.\n"
+ "  -B|--auto-deconfigure      Install even if it would break some other package.\n"
++"  --skip-unchanged-files     Skip replacing files in package identical to files on disk.\n"
+ "  --[no-]triggers            Skip or force consequential trigger processing.\n"
+ "  --verify-format=<format>   Verify output format (supported: 'rpm').\n"
+ "  --no-debsig                Do not try to verify package signatures.\n"
+@@ -195,7 +196,7 @@
+ "Options marked [*] produce a lot of output - pipe it through 'less' or 'more' !");
+ 
+ int f_pending=0, f_recursive=0, f_alsoselect=1, f_skipsame=0, f_noact=0;
+-int f_autodeconf=0, f_nodebsig=0;
++int f_autodeconf=0, f_nodebsig=0, f_skipunchanged=0;
+ int f_triggers = 0;
+ int fc_downgrade=1, fc_configureany=0, fc_hold=0, fc_removereinstreq=0, fc_overwrite=0;
+ int fc_removeessential=0, fc_conflicts=0, fc_depends=0, fc_dependsversion=0;
+@@ -724,6 +725,7 @@
+   { "no-also-select",    'N', 0, &f_alsoselect, NULL,      NULL,    0 },
+   { "skip-same-version", 'E', 0, &f_skipsame,   NULL,      NULL,    1 },
+   { "auto-deconfigure",  'B', 0, &f_autodeconf, NULL,      NULL,    1 },
++  { "skip-unchanged-files", 0, 0, &f_skipunchanged, NULL,  NULL,    1 },
+   { "root",              0,   1, NULL,          NULL,      set_root,      0 },
+   { "abort-after",       0,   1, &errabort,     NULL,      set_integer,   0 },
+   { "admindir",          0,   1, NULL,          &admindir, NULL,          0 },
+diff -u -r dpkg-1.17.5ubuntu5.6.orig/src/main.h dpkg-1.17.5ubuntu5.6/src/main.h
+--- dpkg-1.17.5ubuntu5.6.orig/src/main.h	2013-12-09 22:14:22.000000000 -0800
++++ dpkg-1.17.5ubuntu5.6/src/main.h	2016-08-05 03:56:38.946107555 -0700
+@@ -112,7 +112,7 @@
+ extern const char *const statusstrings[];
+ 
+ extern int f_pending, f_recursive, f_alsoselect, f_skipsame, f_noact;
+-extern int f_autodeconf, f_nodebsig;
++extern int f_autodeconf, f_nodebsig, f_skipunchanged;
+ extern int f_triggers;
+ extern int fc_downgrade, fc_configureany, fc_hold, fc_removereinstreq, fc_overwrite;
+ extern int fc_removeessential, fc_conflicts, fc_depends, fc_dependsversion;
+diff -u -r dpkg-1.17.5ubuntu5.6.orig/man/dpkg.1 dpkg-1.17.5ubuntu5.6/man/dpkg.1
+--- dpkg-1.17.5ubuntu5.6.orig/man/dpkg.1	2013-12-09 22:14:22.000000000 -0800
++++ dpkg-1.17.5ubuntu5.6/man/dpkg.1	2016-08-05 07:06:15.838501629 -0700
+@@ -580,6 +580,11 @@
+ Don't install the package if the same version of the package is already
+ installed.
+ .TP
++\fB\-\-skip\-unchanged\-files\fP
++Skip installing files that are present on the disk and are identical to
++the ones in the package. This is useful to avoid duplication of data blocks
++when updating a snapshot of a COW filesystem like Btrfs.
++.TP
+ .BI \-\-pre\-invoke= command
+ .TQ
+ .BI \-\-post\-invoke= command
+diff -u -r dpkg-1.17.5ubuntu5.6.orig/debian/changelog dpkg-1.17.5ubuntu5.6/debian/changelog
+--- dpkg-1.17.5ubuntu5.6.orig/debian/changelog	2016-04-25 11:52:44.000000000 -0700
++++ dpkg-1.17.5ubuntu5.6/debian/changelog	2016-08-05 06:55:37.017797778 -0700
+@@ -1,3 +1,10 @@
++dpkg (1.17.5ubuntu5.6-pluribus1) trusty; urgency=medium
++
++  * Add new --skip-unchanged-files option to avoid installing unchanged files.
++    Saves disk space when using COW filesystems and updating snapshots.
++
++ -- Moinak Ghosh <moinak.ghosh@pluribusnetworks.com>  Fri, 05 Aug 2016 19:26:00 +0530
++
+ dpkg (1.17.5ubuntu5.6) trusty; urgency=medium
+ 
+   * dpkg-maintscript-helper: s/exit/return/ in subshells (LP: #1574285)
