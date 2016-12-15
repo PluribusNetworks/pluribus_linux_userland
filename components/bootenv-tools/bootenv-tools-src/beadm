@@ -1,0 +1,588 @@
+#!/usr/bin/ksh
+#
+# COPYRIGHT 2016 Pluribus Networks Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#     http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+
+EARGS=2
+PROG=`basename $0`
+USAGE="Usage:
+	$PROG create [-a] beName
+	$PROG activate beName
+	$PROG destroy [-F] beName
+	$PROG list [-d] [-H]
+	$PROG listv"
+
+usage()
+{
+	echo "$USAGE"
+}
+
+die()
+{
+	echo "Error: $1" >&2
+	exit 2
+}
+
+OPTIONS="a"
+
+if [ $# = 0 ]; then
+	usage >&2
+	exit $EARGS
+fi
+
+# Keep this option hidden
+FORCE_ROOT=0
+BASEBEMNT="/.rootbe"
+while getopts "F:" opt; do
+	case $opt in
+	F) FORCE_ROOT=1; BASEBEMNT=$OPTARG;;
+	esac
+done
+
+shift $((OPTIND-1))
+
+if [ "$BASEBEMNT" = "/" ]; then
+	die "Alternate rootbe-dir as $BASEBEMNT is disallowed!"
+fi
+
+# Source the /etc/default/grub to ensure that the grub properties are honoured
+# for the grub entries that this script generates.
+source $BASEBEMNT/etc/default/grub
+source $BASEBEMNT/etc/default/pn_serial
+
+ROOTDISK=`df -P $BASEBEMNT | tail -1 | gawk '{print $1}'`
+ROOTDEVICE=`echo $ROOTDISK | sed 's/\/dev\///'`
+ROOTDISKUUID=`blkid -o udev $ROOTDISK  | gawk -F= '$1 == "ID_FS_UUID"{print$2}'`
+
+if [ "$FORCE_ROOT" = 1 ]; then
+	# CURRENTBE is not relevant in this mode.
+	CURRENTBE="-"
+else
+	CURRENTBE=`cat /etc/mtab | gawk '$2 == "/"{print $4}' | sed "s/.*subvol\=//"`
+	# Strip the "@/" for cases like "@/be1". However, for the initial be (ie. "@")
+	# nothing changes.
+	CURRENTBE=${CURRENTBE##@/}
+fi
+
+grubent=([sda1]="(hd0,gpt1)"
+	[sda2]="(hd0,gpt2)"
+	[sda3]="(hd0,gpt3)"
+	[sda4]="(hd0,gpt4)"
+	[sdb1]="(hd1,gpt1)"
+	[sdb2]="(hd1,gpt2)"
+	[sdb3]="(hd1,gpt3)"
+	[sdb4]="(hd1,gpt4)"
+	[sdc1]="(hd2,gpt1)"
+	[sdc2]="(hd2,gpt2)"
+	[sdc3]="(hd2,gpt3)"
+	[sdc4]="(hd2,gpt4)")
+
+convert()
+{
+	num=$1
+	echo "
+	scale=2
+	sz=$num
+	s = 0
+	while (sz > 1024 && s < 3) {
+	  sz = sz / 1024
+	  s = s + 1
+	}
+	if (s == 0) {
+	  print sz,\"B\"
+	}
+	if (s == 1) {
+	  print sz,\"KiB\"
+	}
+	if (s == 2) {
+	  print sz,\"MiB\"
+	}
+	if (s == 3) {
+	  print sz,\"GiB\"
+	} " | bc -l
+}
+
+# Prepare for a chroot by mounting : sys dev proc
+prep_chroot()
+{
+	# mount : sys dev proc
+	for i in sys dev proc; do
+		mount --bind /$i /$BASEBEMNT/$i
+	done
+}
+
+# Unmount the filesystems mounted for chroot
+tear_down_chroot()
+{
+	# unmount : sys dev proc
+	for i in sys dev proc; do
+		umount /$BASEBEMNT/$i
+	done
+}
+
+#
+# This routine walks through the entries in FSTAB passed and changes the
+# subvol= value to the new BE.
+#
+fix_root_fstab_entry()
+{
+	SUBVOL=$1
+	FSTAB=$2
+
+	#
+	# If fstab has ssd option then that has to be maintained.
+	#
+	extra_opts="compress=lzo"
+	grep ",ssd," $FSTAB > /dev/null
+	if [ $? -eq 0 ]
+	then
+		extra_opts="ssd,compress=lzo"
+	fi
+
+	sed -i.org "/^[^ \t][^ \t]*[ \t][ \t]*\/[ \t]/s/subvol=[^ \t,]*/subvol=@\/$SUBVOL/" $FSTAB
+
+	# Add an entry for "/.rootbe" if not found
+	grep "^UUID=.* /.rootbe" $FSTAB > /dev/null
+	if [ $? -ne 0 ]; then
+		echo "UUID=$ROOTDISKUUID /.rootbe btrfs defaults,${extra_opts},noatime,subvol=@ 0 1" \
+			>> $FSTAB
+	fi
+}
+
+#
+# Add grub entry for the given BE
+#
+add_grub_entry()
+{
+	BE=$1
+
+	# Pick the latest vmlinuz and initrd
+	VMLINUZ=`ls -tr $BASEBEMNT/$BE/boot/vmlinuz* | tail -n 1 | sed 's/.*\///'`
+	INITRD=`echo $VMLINUZ | sed 's/^vmlinuz/initrd\.img/'`
+
+	if [[ ! -f "$BASEBEMNT/$BE/boot/$INITRD" ]]; then
+		echo "Failed to find $INTRD for $BE" >&2
+		return
+	fi
+
+	# Find the diskname and partition from $ROOTDISK
+	if [[ $ROOTDEVICE == md* ]]
+	then
+		GRUBDISK="mduuid/`mdadm --detail /dev/$ROOTDEVICE | grep 'UUID' | gawk '{ print $NF }' | tr -d :`"
+		[ "x$GRUBDISK" = "x" ] && die "Can't compute root entry for /dev/$ROOTDEVICE"
+		SETROOT_ENTRY="set root='${GRUBDISK}'"
+	else
+		SETROOT_ENTRY="search --no-floppy --fs-uuid --set=root ${ROOTDISKUUID}"
+	fi
+
+	# todo : need to figure out why the bootup messages are not visible on the
+	# serial console.
+	cat << GRUB_ENTRY
+menuentry ${BE} \$menuentry_id_option '$BE' {
+	insmod gzio
+	insmod part_gpt
+	insmod ext2
+	insmod btrfs
+	${SETROOT_ENTRY}
+	sleep 5
+	linux /@/$BE/vmlinuz root=UUID=${ROOTDISKUUID} ro rootflags=subvol=@/${BE} console=$PN_CONSOLE_ARG ${PN_EXTRA_ARGS}
+	initrd /@/$BE/initrd.img
+	sleep 5
+}
+GRUB_ENTRY
+}
+
+add_onie_grub_entry()
+{
+	cat << ONIE_GRUB_ENTRY
+#!/bin/sh
+exec tail -n +3 \$0
+# Grub entry for ONIE
+
+menuentry ONIE {
+        search --no-floppy --label --set=root ONIE-BOOT
+        echo 'Loading ONIE ...'
+        chainloader +1
+}
+ONIE_GRUB_ENTRY
+}
+
+# This will just list out the BEs on this machine
+be_list()
+{
+	qg=`btrfs qgroup show $BASEBEMNT`
+	for i in `btrfs subvol list $BASEBEMNT | gawk '{printf "%s,%s\n", $2, $NF}' | grep -v "@."`;
+	do
+		_OIFS="$IFS"
+		IFS=","
+		set -- $i
+		IFS="$_OIFS"
+		b=$2
+		id=$1
+		sizes=`echo "$qg" | awk -v qid="/$id" '{ if (match($1, qid) > 0) { printf "%s,%s", $2, $3; } }'`
+		if [[ -f "$BASEBEMNT/$b/.bootable" || "$b" = "@" ]]; then
+			echo "$b,$sizes"
+		fi
+	done
+}
+
+is_valid_be()
+{
+	[[ -f "$BASEBEMNT/$1/.bootable" ]] || [[ "$1" == "@" ]]
+}
+
+#
+# Generate GRUB entries for the given BE
+# This will generate the entry as : 
+# /.rootbe/etc/grub.d/50_custom_<BE>
+#
+generate_grub_entry()
+{
+	BE=$1
+
+	# To handle creation of BE during intial provisioning
+	mkdir -p /tmp
+
+	TEMPFILE=`tempfile -d /tmp`
+	echo "#!/bin/sh" > $TEMPFILE
+	echo 'exec tail -n +3 $0' >> $TEMPFILE
+	echo "# Grub entry for BE:$BE generated by beadm command" >> $TEMPFILE
+
+	add_grub_entry $BE >> $TEMPFILE
+
+	mv $TEMPFILE $BASEBEMNT/etc/grub.d/50_custom_$BE
+	chmod +x $BASEBEMNT/etc/grub.d/50_custom_$BE
+
+}
+
+delete_grub_entry()
+{
+	BE=$1
+
+	rm $BASEBEMNT/etc/grub.d/50_custom_$BE
+}
+
+update_grub_cfg()
+{
+	prep_chroot
+	PATH=/usr/bin:/usr/sbin:/bin:/sbin:$PATH \
+		chroot $BASEBEMNT /usr/sbin/update-grub
+	tear_down_chroot
+}
+
+#
+# Clones a BE from the given source BE
+# $1 - source BE
+# $2 - new BE
+# This does the following :
+# - Clones the given BE
+# - Fixes the fstab entry
+# - Adds an entry into the grub
+#
+create_be()
+{
+	SRC_BE=$1
+	NEW_BE=$2
+
+	is_valid_be $NEW_BE && die "$NEW_BE already exists !"
+
+	if [ "$FORCE_ROOT" = 1 ]; then
+		SRCPATH="$BASEBEMNT"
+		DESTPATH="$BASEBEMNT/$NEW_BE"
+	elif [ "$SRC_BE" = "@" ]; then
+		SRCPATH="/"
+		DESTPATH="/$NEW_BE"
+	else
+		SRCPATH="$BASEBEMNT/$SRC_BE"
+		DESTPATH="$BASEBEMNT/$NEW_BE"
+	fi
+
+	# Create the new BE
+	btrfs subvolume snapshot $SRCPATH $DESTPATH
+	rc=$?
+	if [[ $rc -ne 0 ]]; then
+		echo "Failed to create snapshot /$NEW_BE"
+		return $rc
+	fi
+
+	touch $BASEBEMNT/$NEW_BE/.bootable
+
+	#
+	# Fix the /etc/fstab in the newbe to mount that be as "/"
+	#
+	fix_root_fstab_entry $NEW_BE $BASEBEMNT/$NEW_BE/etc/fstab
+
+	# Generate the GRUB entry for the new BE
+	generate_grub_entry $NEW_BE
+	update_grub_cfg
+}
+
+#
+# Find the current active-BE and clone it
+#
+do_create()
+{
+	if [[ $1 == "-a" ]]; then
+		ACTIVATE=true
+		shift
+	fi
+
+	create_be $CURRENTBE $1 || die "Failed to create the BE:$1"
+
+	[[ -n "$ACTIVATE" ]] && activate_be $1
+}
+
+#
+# Enable the given BE
+#
+activate_be()
+{
+	BE=$1
+
+	is_valid_be $BE || die "No such BE found : $BE"
+
+	grub-editenv $BASEBEMNT/boot/grub/grubenv set next_entry=$BE
+}
+
+#
+# Walk through the snapshots under @/be* and has a ".bootable" file under it.
+#
+list_be()
+{
+	LISTOPTS="dH"
+	DESC=0
+	PARSABLE=0
+	DATE_FORMAT="+%Y-%m-%d %H:%M"
+
+	PRT_FMT="%s\t%s\t%s\t\t%s\t%s\t%s\n"
+
+	# If "-H" is specified print the description of the 
+	PRT_FMT_D="%s\t%s\t%s\t%s\t\t%s\t%s\t%s\n"
+
+	while getopts "$LISTOPTS" opt; do
+		case $opt in
+			d) DESC=1;;
+			H) PARSABLE=1;
+				 DATE_FORMAT="+%s";
+				 PRT_FMT="%s;%s;%s;%s;%s;%s;%s\n";;
+		esac
+	done
+
+	if [[ $PARSABLE -ne 1 ]]; then
+		printf 'BE-name\tActive\tMountpoint\tSpace\tPolicy\tCreated\n'
+		printf '-------\t------\t----------\t-----\t------\t-------\n'
+	fi
+
+	for i in `be_list`
+	do
+		_OIFS="$IFS"
+		IFS=","
+		set -- $i
+		IFS="$_OIFS"
+		i=$1
+		refer=$2
+		excl=$3
+
+		# Check if the BE is active
+		ACTIVE=""
+		if [[ $i = "$CURRENTBE" ]]; then
+			ACTIVE="N"
+		fi
+		if [[ $i = "$next_entry" ]]; then
+			ACTIVE=$ACTIVE"R"
+		fi
+
+		[[ "x$ACTIVE" == "x" && $PARSABLE -ne 1 ]] && ACTIVE="-"
+			
+		# Mountpoint :
+		# For now we donot support mountpoint.
+		if [[ $PARSABLE -ne 1 ]]; then
+			MNTPT="-"
+		else
+			MNTPT=""
+		fi
+
+		# Handle the BE "@"  as special case.
+		BE="$i"
+		[[ $i == "@" ]] && BE=""
+
+		SIZE=$excl
+		if [[ $i = "$CURRENTBE" ]]; then
+			SIZE=$refer
+		fi
+
+		SPACE=0
+		if [[ $PARSABLE -eq 1 ]]; then
+			SPACE=$SIZE
+		else
+			SPACE=`convert $SIZE`
+		fi
+
+		POLICY="static"
+
+		CR_TIME_TMP=`btrfs subvol show $BASEBEMNT/$BE | \
+				grep "Creation time" | \
+				gawk '{print $3,$4}'` 
+		CR_TIME=`date --date="$CR_TIME_TMP" "$DATE_FORMAT"`
+
+		if [[ $PARSABLE -eq 1 ]]; then
+			printf $PRT_FMT "$i" "$i" "$ACTIVE" "$MNTPT" "$SPACE" "$POLICY" "$CR_TIME"
+		else
+			printf $PRT_FMT "$i" "$ACTIVE" "$MNTPT" "$SPACE" "$POLICY" "$CR_TIME"
+		fi
+	done
+}
+
+do_delete()
+{
+	BE=$1
+
+	#
+	# Compatibility flag with Solaris beadm because of common code.
+	# It is a no-op here.
+	#
+	if [ "$BE" = "-F" ]
+	then
+		BE=$2
+	fi
+
+	is_valid_be $BE || die "No such BE found : $BE"
+
+	if [ "$BE" = "$CURRENTBE" ]; then
+		echo "BE: $BE is the active BE. Hence, cannot be deleted !"
+		exit 1
+	fi
+
+	if [ "$BE" = "@" ]; then
+		echo "BE: @ is the the base-BE ! Hence, cannot be deleted !"
+		exit 1
+	fi
+
+	# Delete the qgroup-id of the BE being delete.
+	subvol_id=`btrfs subvol show /$BASEBEMNT/$BE | \
+			grep "Object ID:" | gawk -F: '{print $2}' | tr -d " \t"`
+	qgroup_id="0/${subvol_id}"
+	btrfs qgroup destroy $qgroup_id /$BASEBEMNT/$BE
+
+	# Delete the corresponding subvol and regenerate the grub entries
+	btrfs subvol delete /$BASEBEMNT/$BE
+	delete_grub_entry $BE
+	update_grub_cfg
+
+	if [ "$BE" = "$next_entry" ]; then
+		echo "BE: $BE was activated-BE for next reboot."
+		echo "Setting the current BE ($CURRENTBE) as the active-BE"
+		
+		# If the current BE is "@" nothing more is needed as it is the default BE.
+		if [ "$CURRENTBE" != "@" ]; then
+			activate_be $CURRENTBE
+		fi
+	fi
+}
+
+get_be_version()
+{
+	BE=$1
+
+	is_valid_be $BE || die "No such BE found : $BE"
+
+	# Convert the BE name to its mountpoint
+	if [ "$BE" = "@" ]; then
+		dir=""
+	else
+		dir=$BE
+	fi
+
+	# The version of a BE is basically the version of the package "lsb-release"
+	# installed in that BE
+	VERS_PKG="lsb-release"
+
+	VERS=$(dpkg-query --admindir=$BASEBEMNT/$dir/var/lib/dpkg \
+		-W -f='${Version}\n' $VERS_PKG 2>/dev/null)
+
+	echo "$BE $VERS"
+}
+
+list_be_version()
+{
+	# If a BE is specified by the user list the version for that BE.
+	# Else, list all the BEs and their versions
+	if [ $# -ne 0 ]; then
+		for i in $@
+		do
+			get_be_version $i
+		done
+	else
+		for i in `be_list`
+		do
+			_OIFS="$IFS"
+			IFS=","
+			set -- $i
+			IFS="$_OIFS"
+			i=$1
+			get_be_version $i
+		done
+	fi
+}
+
+# Source in the current grubenv file.
+# This will get the next_entry variable
+source $BASEBEMNT/boot/grub/grubenv
+
+#
+# On initial system environments next_entry may not be set
+# In that case set it to current BE.
+#
+if [ "x$next_entry" = "x" ]
+then
+	next_entry="$CURRENTBE"
+fi
+
+CMD=$1; shift
+
+case "$CMD" in
+'create')
+	if [ $# -lt 1 ]; then
+		usage >&2
+		exit $EARGS;
+	fi
+	do_create "$@"
+	;;
+'destroy')
+	if [ $# -lt 1 ]; then
+		usage >&2
+		exit $EARGS;
+	fi
+	do_delete "$@"
+	;;
+'activate')
+	if [ $# != 1 ]; then
+		usage >&2
+		exit $EARGS;
+	fi
+	activate_be "$@"
+	;;
+'list')
+	list_be "$@"
+	;;
+'listv')
+	list_be_version "$@"
+	;;
+h|*)
+	usage
+esac
+
+exit 0

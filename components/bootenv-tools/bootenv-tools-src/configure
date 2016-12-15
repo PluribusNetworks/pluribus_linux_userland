@@ -1,0 +1,22 @@
+#!/bin/sh
+
+PROGS="beadm apt-wrapper btrfs_balance.sh"
+echo "
+PROGS = $PROGS
+all:
+	echo 'Done'
+install:
+	mkdir -p \$(DESTDIR)/usr/bin
+	for prg in \$(PROGS); do cp \$\$prg \$(DESTDIR)/usr/bin; done
+	chmod a+x \$(DESTDIR)/usr/bin/*
+clean:
+	rm -f \$(PROGS)
+" > Makefile
+
+srcdir=`dirname $0`
+for prg in $PROGS
+do
+	ln -s ${srcdir}/$prg
+done
+
+echo "DONE"

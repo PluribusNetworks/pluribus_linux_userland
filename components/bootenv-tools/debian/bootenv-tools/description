@@ -1,0 +1,40 @@
+Tools to manage "Boot Environments" on Ubuntu using the features
+of the Btrfs filesystem. Boot Environments are essentially Btrfs
+subvolumes and snapshots containing a complete root image and
+can be booted into.
+
+These tools were developed to support easy upgrade and rollback
+for Pluribus Networks switches running with Btrfs filesystem and
+are currently a little "raw", in that they make some assumptions
+and have some fixed behaviour. These tools will be made more
+general in future.
+
+These tools assume an Ubuntu base with '@' as the root subvolume.
+They also assume the presence of a directory called /.rootbe that
+will have all the boot environments mounted.
+
+The tools included are following:
+
+1) beadm - A utility to create, delete, list and activate boot
+           environments.
+           Btrfs qgroups must be enabled for this to work properly.
+           Boot Environment creation creates a writable snapshot
+           of the currently booted root fs subvolume and creates a
+           file in it so that the beadm script can differntiate it
+           in future from other subvolumes.
+
+2) apt-wrapper - A wrapper script over apt-get. This script detects
+           an attempt to do "dist-upgrade" and does the following:
+           * Create a new Boot Environment
+           * Run "apt-get dist-upgrade" on the new Boot Environment
+             inside a chroot.
+           * Once dist-upgrade completes the new BE is activated.
+           * Upon next reboot system boots into the new BE.
+           Note that the current running environment is left untouched
+           and continues to function normally while the upgrade is
+           happening. 
+
+3) btrfs_balance.sh - A script to do the btrfs balance maintenance
+           with less impact to running processes and intended to be
+           run frequently.
+

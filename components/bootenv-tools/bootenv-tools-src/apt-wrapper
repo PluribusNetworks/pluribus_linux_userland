@@ -1,0 +1,99 @@
+#!/bin/ksh
+#
+# COPYRIGHT 2016 Pluribus Networks Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#     http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+BEADM=/usr/bin/beadm
+APT=/usr/bin/apt-get
+THISBE=`$BEADM list -dH | awk -F";" '$3 == "NR" { print $1 }'`
+
+if [ "$1" = "dist-upgrade" ]
+then
+	#
+	# Dist-Upgrade into new BE
+	#
+	num=0
+	name=`echo $THISBE | cut -d'-' -f1`
+	if [[ $THISBE =~ \-[0-9]+$ ]]
+	then
+		#
+		# Determine if there are any other BEs starting with the same
+		# name as current BE and ending with '-<number>' and fetch
+		# the largest such number.
+		#
+		for be_nm in `$BEADM list -dH | grep "^$name" | cut -d';' -f1`
+		do
+			if [[ $be_nm =~ ^${name}\-[0-9]+ ]]
+			then
+				n=`echo $be_nm | cut -d'-' -f2`
+				[ $n -gt $num ] && num=$n
+			fi
+		done
+	fi
+
+	#
+	# New BE name is 'current BE name-<largest number + 1>'
+	#
+        [ "$THISBE" = "@" ] && name="bootenv"
+	num=$((num + 1))
+	newbe="${name}-${num}"
+	$BEADM create $newbe
+	if [[ $? -ne 0 ]] || [[ ! -d /$testbe ]]
+	then
+		echo "BE creation failed!"
+		exit 1
+	fi
+
+	#
+	# Now the new BE is dist-upgraded and current running BE is left
+	# untouched.
+	#
+	newbe_path=/.rootbe/${newbe}
+	urandom_created=0
+        touch ${newbe_path}/SKIP_ROOTFS_CHECK
+	mount --bind /proc ${newbe_path}/proc
+	if [ ! -e ${newbe_path}/dev/urandom ]
+	then
+		urandom_created=1
+		touch ${newbe_path}/dev/urandom
+	fi
+	mount --bind /dev ${newbe_path}/dev
+	mount -t devpts none ${newbe_path}/dev/pts
+	mount --bind /dev/urandom ${newbe_path}/dev/urandom
+	mount --bind /sys ${newbe_path}/sys
+	chroot ${newbe_path} $APT "$@"
+	rv=$?
+	umount ${newbe_path}/proc
+	umount ${newbe_path}/dev/pts
+	umount ${newbe_path}/dev/urandom
+	umount ${newbe_path}/dev
+	umount ${newbe_path}/sys
+	[ $urandom_created = 1 ] && rm ${newbe_path}/dev/urandom
+        rm ${newbe_path}/SKIP_ROOTFS_CHECK
+	if [ $rv -ne 0 ]
+	then
+		$BEADM delete $newbe
+	else
+		$BEADM activate $newbe
+		echo "-----------------------------------------------------------"
+		echo "A new Boot Environment $newbe has been created and updated."
+		echo "Reboot when ready to boot into this new BE."
+		echo "-----------------------------------------------------------"
+	fi
+	exit $rv
+else
+	exec $APT "$@"
+fi
+
