@@ -1,0 +1,44 @@
+--- dpkg-1.17.5ubuntu5.6/lib/dpkg/dpkg.h.orig	2017-01-02 06:08:36.400076371 -0800
++++ dpkg-1.17.5ubuntu5.6/lib/dpkg/dpkg.h	2017-01-02 07:06:57.896105502 -0800
+@@ -113,6 +113,8 @@
+ #define CAT		"cat"
+ #define FIND		"find"
+ #define DIFF		"diff"
++#define	fsync		Fsync
++#define	sync_file_range		Sync_file_range
+ 
+ #define FIND_EXPRSTARTCHARS "-(),!"
+ 
+@@ -159,6 +161,8 @@
+ int fgets_checked(char *buf, size_t bufsz, FILE *f, const char *fn);
+ int fgets_must(char *buf, size_t bufsz, FILE *f, const char *fn);
+ 
++int Fsync(int fd); /* Clobber all fsyncs!! */
++
+ DPKG_END_DECLS
+ 
+ #endif /* LIBDPKG_DPKG_H */
+--- dpkg-1.17.5ubuntu5.6/lib/dpkg/utils.c.orig	2017-01-02 06:15:03.964079596 -0800
++++ dpkg-1.17.5ubuntu5.6/lib/dpkg/utils.c	2017-01-02 07:06:28.356105257 -0800
+@@ -76,3 +76,21 @@
+ 
+ 	return l;
+ }
++
++/*
++ * Clobber fsyncs. Yes yes we know all the big drama with this
++ * but our operating model precludes all risk with this and
++ * only requires a single sync() at the end of all package
++ * stuff.
++ */
++int
++Fsync(int fd)
++{
++	return (0);
++}
++
++int
++Sync_file_range(int fd, off64_t offset, off64_t nbytes, unsigned int flags)
++{
++	return (0);
++}
