@@ -90,8 +90,8 @@ include $(WS_MAKE_RULES)/ips-buildinfo.mk
 COMPILER =		gcc
 LINKER =		gcc
 BITS =			$(shell getconf LONG_BIT)
-PYTHON_VERSION =	2.6
-PYTHON_VERSIONS =	2.6 2.7
+PYTHON_VERSION =	2.7
+PYTHON_VERSIONS =	2.7
 
 BASS_O_MATIC =	$(WS_TOOLS)/bass-o-matic
 
