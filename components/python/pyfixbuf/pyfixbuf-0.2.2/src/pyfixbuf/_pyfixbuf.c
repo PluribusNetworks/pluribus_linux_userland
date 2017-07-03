@@ -1671,6 +1671,9 @@ static PyObject *fixbufPyRecordSetOffset(
             return NULL;
             }*/
 
+    } else if (IS_BYTE(value)) {
+	string = PyByteArray_AsString(value);
+	memcpy(self->rec + offset, string, len);
     } else if (type == FB_SUB_TMPL_MULTI_LIST) {
         if (!fixbufPySTML_Check(value)) {
             PyErr_SetString(PyExc_AttributeError,
