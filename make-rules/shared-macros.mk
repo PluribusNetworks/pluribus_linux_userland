@@ -90,8 +90,8 @@ include $(WS_MAKE_RULES)/ips-buildinfo.mk
 COMPILER =		gcc
 LINKER =		gcc
 BITS =			$(shell getconf LONG_BIT)
-PYTHON_VERSION =	2.6
-PYTHON_VERSIONS =	2.6 2.7
+PYTHON_VERSION =	2.7
+PYTHON_VERSIONS =	2.7
 
 BASS_O_MATIC =	$(WS_TOOLS)/bass-o-matic
 
@@ -375,12 +375,12 @@ LINT =		$(lint.$(BITS))
 
 LD =		/usr/bin/ld
 
-PYTHON.2.6.VENDOR_PACKAGES.32 = /usr/lib/python2.6/vendor-packages
-PYTHON.2.6.VENDOR_PACKAGES.64 = /usr/lib/python2.6/vendor-packages/64
+PYTHON.2.6.VENDOR_PACKAGES.32 = /usr/lib/python2.6/vendor-packages/$(MACH32)
+PYTHON.2.6.VENDOR_PACKAGES.64 = /usr/lib/python2.6/vendor-packages
 PYTHON.2.6.VENDOR_PACKAGES = $(PYTHON.2.6.VENDOR_PACKAGES.$(BITS))
 
-PYTHON.2.7.VENDOR_PACKAGES.32 = /usr/lib/python2.7/vendor-packages
-PYTHON.2.7.VENDOR_PACKAGES.64 = /usr/lib/python2.7/vendor-packages/64
+PYTHON.2.7.VENDOR_PACKAGES.32 = /usr/lib/python2.7/vendor-packages/$(MACH32)
+PYTHON.2.7.VENDOR_PACKAGES.64 = /usr/lib/python2.7/vendor-packages
 PYTHON.2.7.VENDOR_PACKAGES = $(PYTHON.2.7.VENDOR_PACKAGES.$(BITS))
 
 ifeq   ($(strip $(PARFAIT_BUILD)),yes)
@@ -409,17 +409,12 @@ RUBY =          $(RUBY.$(RUBY_VERSION))
 # both the ruby version and the ruby library version are needed. 
 RUBY_VERSIONS = $(RUBY_LIB_VERSION)
 
-PYTHON_VENDOR_PACKAGES.32 = /usr/lib/python$(PYTHON_VERSION)/vendor-packages
-PYTHON_VENDOR_PACKAGES.64 = /usr/lib/python$(PYTHON_VERSION)/vendor-packages/64
+PYTHON_VENDOR_PACKAGES.32 = /usr/lib/python$(PYTHON_VERSION)/vendor-packages/$(MACH32)
+PYTHON_VENDOR_PACKAGES.64 = /usr/lib/python$(PYTHON_VERSION)/vendor-packages
 PYTHON_VENDOR_PACKAGES = $(PYTHON_VENDOR_PACKAGES.$(BITS))
 
-PYTHON.2.6.32 =	/usr/bin/python2.6
-PYTHON.2.6.64 =	/usr/bin/$(MACH64)/python2.6
+PYTHON.2.7.64 =	/usr/bin/python2.7
 
-PYTHON.2.7.32 =	/usr/bin/python2.7
-PYTHON.2.7.64 =	/usr/bin/$(MACH64)/python2.7
-
-PYTHON.32 =	$(PYTHON.$(PYTHON_VERSION).32)
 PYTHON.64 =	$(PYTHON.$(PYTHON_VERSION).64)
 PYTHON =	$(PYTHON.$(PYTHON_VERSION).$(BITS))
 

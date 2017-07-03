@@ -1,0 +1,12 @@
+Metadata-Version: 1.0
+Name: pyfixbuf
+Version: 0.2.2
+Summary: Python fixbuf
+Home-page: http://tools.netsa.cert.org/pyfixbuf/index.html
+Author: NetSA Group
+Author-email: netsa-help@cert.org
+License: LGPL
+Description:  
+        A set of Python bindings for the fixbuf IPFIX protocol library.
+        
+Platform: UNKNOWN
