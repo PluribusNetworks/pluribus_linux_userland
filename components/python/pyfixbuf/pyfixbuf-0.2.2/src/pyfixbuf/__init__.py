@@ -2611,7 +2611,7 @@ def bytes_to_v6(bytes):
 
 
 def v6_to_bytes(v6):
-    return ipaddress.IPv6Address(v6).packed()
+    return bytes(ipaddress.IPv6Address(v6).packed)
 
 
 def create_stml_from_list(list):
