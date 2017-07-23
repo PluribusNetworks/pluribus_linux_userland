@@ -122,7 +122,7 @@ def typeToLength(dt):
 def lenToType(len, dt):
     signed = False
     float = False
-    if dt in [DataType.INT8, DataType.INT16, DataType.INT32, DataType.INT64]:
+    if dt in (DataType.INT8, DataType.INT16, DataType.INT32, DataType.INT64):
         signed = True
     elif ((dt == DataType.FLOAT32) or (dt == DataType.FLOAT64)):
         float = True
@@ -1375,46 +1375,46 @@ class Record(_pyfixbuf.fbRecordBase):
         which is an index into the :class:`Record`.
         """
         key = self.normalize_key(key)
-        if (key not in self.type_dict):
+        ktyp = None
+        try:
+            ktyp = self.type_dict[key]
+        except KeyError:
             raise Exception(key + " does not exist in Record.")
-        if (self.type_dict[key] == BASICLIST):
+        if (ktyp == BASICLIST):
+            kbasic = self.basic_list[key]
+            if (kbasic == None):
+                raise Exception("Basic List \"" + key + "\"  has not "
+                                "been initialized, call init_basic_list()");
             if (isinstance(value, list)):
-                if (self.basic_list[key] == None):
-                    raise Exception("Basic List \"" + key + "\"  has not "
-                                    "been initialized, call init_basic_list()");
-                elif (isinstance(self.basic_list[key], BL)):
-                    self.basic_list[key].copy(value)
-                    bl = self.basic_list[key]
+                if (isinstance(kbasic, BL)):
+                    kbasic.copy(value)
+                    bl = kbasic
                 else:
-                    self.basic_list[key] = BL(self.model, self.basic_list[key],
-                                              len(value))
-                    self.basic_list[key].copy(value)
-                    bl = self.basic_list[key]
+                    kbasic = BL(self.model, kbasic, len(value))
+                    kbasic.copy(value)
+                    self.basic_list[key] = kbasic
+                    bl = kbasic
             elif (not(isinstance(value, BL))):
-                if (self.basic_list[key] == None):
-                    raise Exception("Basic List \"" + key + "\" has not "
-                                    "been initialized, call init_basic_list()");
-                elif (isinstance(self.basic_list[key], BL)):
-                    self.basic_list[key].copy([value])
-                    bl = self.basic_list[key]
+                if (isinstance(kbasic, BL)):
+                    kbasic.copy([value])
+                    bl = kbasic
                 else:
-                    self.basic_list[key] = BL(self.model, self.basic_list[key],1)
-                    self.basic_list[key].copy([value])
-                    bl = self.basic_list[key]
+                    kbasic = BL(self.model, kbasic, 1)
+                    kbasic.copy([value])
+                    self.basic_list[key] = kbasic
+                    bl = kbasic
             else:
                 bl = value
             _pyfixbuf.fbRecordBase.setOffset(self, bl, self.off_dict[key],
-                                             self.len_dict[key],
-                                             self.type_dict[key])
+                                             self.len_dict[key], ktyp)
         else:
-            if ((self.type_dict[key] == DataType.IP4ADDR)
-                and isinstance(value, str)):
+            if (ktyp == DataType.IP4ADDR and isinstance(value, str)):
                 value = int(ipaddress.IPv4Address(value))
-            elif (self.type_dict[key] == DataType.IP6ADDR):
+            elif (ktyp == DataType.IP6ADDR):
                 value = v6_to_bytes(value)
-            elif (self.type_dict[key] == DataType.MAC_ADDR):
+            elif (ktyp == DataType.MAC_ADDR):
                 value = macToHex(value)
-            elif (self.type_dict[key] == SUBTEMPLATELIST):
+            elif (ktyp == SUBTEMPLATELIST):
                 self.list_init = True
                 if (isinstance(value, list)):
                     stl = STL(self, key)
@@ -1424,13 +1424,13 @@ class Record(_pyfixbuf.fbRecordBase):
                                         "be associated with template.")
                     stl.entry_init(value[0], template, len(value))
                     i = 0
-                    while (i < len(value)):
-                        stl[i] = value[i]
+                    for v in value:
+                        stl[i] = v
                         i += 1
                     value = stl
                 elif (isinstance(value, STL)):
                     value.inrec=self
-            elif (self.type_dict[key] == SUBTEMPLATEMULTILIST):
+            elif (ktyp == SUBTEMPLATEMULTILIST):
                 self.list_init = True
                 if (isinstance(value, list)):
                     stml = create_stml_from_list(value)
@@ -1438,14 +1438,13 @@ class Record(_pyfixbuf.fbRecordBase):
                 elif (isinstance(value, STML)):
                     value._put_stml_rec(self, self.off_dict[key])
             else:
-                rt = check_type(value, self.type_dict[key])
+                rt = check_type(value, ktyp)
                 if (rt == False):
                     raise Exception("Value is type of " + str(type(value)) +
                                     " but key is of different type")
 
             _pyfixbuf.fbRecordBase.setOffset(self, value, self.off_dict[key],
-                                             self.len_dict[key],
-                                             self.type_dict[key])
+                                             self.len_dict[key], ktyp)
 
     def copy(self, other):
         """
@@ -1455,9 +1454,11 @@ class Record(_pyfixbuf.fbRecordBase):
         if (not(isinstance(other, Record))):
             raise Exception("Copying from non-Record Object")
         for key,value in self.off_dict.items():
-            if other.off_dict.has_key(key):
+            try:
                 newval = other[key]
                 self[key] = newval
+            except KeyError:
+                pass
 
     def is_list(self, key):
         """
@@ -1489,7 +1490,7 @@ class Record(_pyfixbuf.fbRecordBase):
         """
         Gets the subTemplateMultiList with the given *key* and returns
         a newly allocated :class:`STML`.
-        
+
         A :class:`STML` may also be retrieved by using __getitem__().
 
         """
