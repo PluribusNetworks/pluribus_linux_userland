@@ -1,8 +1,35 @@
---- openssh-6.6p1.orig/auth-pam.c	2016-06-30 00:05:23.377135663 -0700
-+++ openssh-6.6p1/auth-pam.c	2016-06-30 10:09:16.865807810 -0700
-@@ -778,12 +778,11 @@
- 				    strlen(**prompts));
- 				free(**prompts);
+diff -ru openssh-7.2p2.patched/auth2.c openssh-7.2p2/auth2.c
+--- openssh-7.2p2.patched/auth2.c	2018-11-29 15:15:17.940990753 +0000
++++ openssh-7.2p2/auth2.c	2018-11-29 15:19:41.623278497 +0000
+@@ -303,9 +303,21 @@
+ 	char *methods;
+ 	int partial = 0;
+ 
+-	if (!authctxt->valid && authenticated)
+-		fatal("INTERNAL ERROR: authenticated invalid user %s",
+-		    authctxt->user);
++	/*
++	 * The following code will normally check invalid user at this point
++	 * but we disable it. We would actually need to call getpwnam() here
++	 * to re-probe the user after PAM auth. But this is a privilege
++	 * separated child running in chroot. There is no way to probe. The
++	 * other guy is waiting for the response so we cannot just call
++	 * PRIVSEP(getpwnamallow). It confuses the protocol sequencing. So
++	 * just ignore and carry on. It does not have fatal consequences
++	 * since the user is also checked in the other process and that guy
++	 * will bail if it can't fnd the user even after successful PAM
++	 * auth.
++	 *if (!authctxt->valid && authenticated)
++	 *	fatal("INTERNAL ERROR: authenticated invalid user %s",
++	 *	    authctxt->user);
++	 */
+ 	if (authenticated && authctxt->postponed)
+ 		fatal("INTERNAL ERROR: authenticated and postponed");
+ 
+diff -ru openssh-7.2p2.patched/auth-pam.c openssh-7.2p2/auth-pam.c
+--- openssh-7.2p2.patched/auth-pam.c	2018-11-29 15:15:17.944990728 +0000
++++ openssh-7.2p2/auth-pam.c	2018-11-29 15:22:06.074303337 +0000
+@@ -780,8 +780,7 @@
  				**prompts = NULL;
  			}
  			if (type == PAM_SUCCESS) {
@@ -12,11 +39,7 @@
  				    options.permit_root_login != PERMIT_YES))
  					fatal("Internal error: PAM auth "
  					    "succeeded when it should have "
- 					    "failed");
- 				import_environments(&buffer);
-@@ -829,13 +828,12 @@
- 	if (num != 1) {
- 		error("PAM: expected one response, got %u", num);
+@@ -854,9 +853,8 @@
  		return (-1);
  	}
  	buffer_init(&buffer);
@@ -26,13 +49,9 @@
 +	if (sshpam_authctxt->pw->pw_uid != 0 ||
 +	    options.permit_root_login == PERMIT_YES)
  		buffer_put_cstring(&buffer, *resp);
- 	else
- 		buffer_put_cstring(&buffer, badpw);
- 	if (ssh_msg_send(ctxt->pam_psock, PAM_AUTHTOK, &buffer) == -1) {
- 		buffer_free(&buffer);
-@@ -1191,25 +1189,49 @@
- 	/*
- 	 * If the user logging in is invalid, or is root but is not permitted
+ 	else {
+ 		fake = fake_password(*resp);
+@@ -1220,8 +1218,8 @@
  	 * by PermitRootLogin, use an invalid password to prevent leaking
  	 * information via timing (eg if the PAM config has a delay on fail).
  	 */
@@ -40,16 +59,13 @@
 -	    options.permit_root_login != PERMIT_YES))
 +	if (authctxt->pw->pw_uid == 0 &&
 +	    options.permit_root_login != PERMIT_YES)
- 		sshpam_password = badpw;
+ 		sshpam_password = fake = fake_password(password);
  
  	sshpam_err = pam_set_item(sshpam_handle, PAM_CONV,
- 	    (const void *)&passwd_conv);
- 	if (sshpam_err != PAM_SUCCESS)
- 		fatal("PAM: %s: failed to set PAM_CONV: %s", __func__,
- 		    pam_strerror(sshpam_handle, sshpam_err));
- 
+@@ -1233,9 +1231,33 @@
  	sshpam_err = pam_authenticate(sshpam_handle, flags);
  	sshpam_password = NULL;
+ 	free(fake);
 -	if (sshpam_err == PAM_SUCCESS && authctxt->valid) {
 +	if (sshpam_err == PAM_SUCCESS) {
 +		struct passwd *fpw, *pw;
@@ -81,13 +97,10 @@
  		return 1;
  	} else {
  		debug("PAM: password authentication failed for %.100s: %s",
- 		    authctxt->valid ? authctxt->user : "an illegal user",
- 		    pam_strerror(sshpam_handle, sshpam_err));
---- openssh-6.6p1.orig/auth-passwd.c	2016-06-30 00:05:32.632988261 -0700
-+++ openssh-6.6p1/auth-passwd.c	2016-06-30 08:25:16.851040346 -0700
-@@ -79,11 +79,11 @@
-  */
- int
+diff -ru openssh-7.2p2.patched/auth-passwd.c openssh-7.2p2/auth-passwd.c
+--- openssh-7.2p2.patched/auth-passwd.c	2018-11-29 15:15:17.944990728 +0000
++++ openssh-7.2p2/auth-passwd.c	2018-11-29 15:19:41.619278524 +0000
+@@ -84,7 +84,7 @@
  auth_password(Authctxt *authctxt, const char *password)
  {
  	struct passwd * pw = authctxt->pw;
@@ -96,11 +109,7 @@
  #if defined(USE_SHADOW) && defined(HAS_SHADOW_EXPIRE)
  	static int expire_checked = 0;
  #endif
- 
- #ifndef HAVE_CYGWIN
-@@ -95,25 +95,28 @@
- 
- #ifdef KRB5
+@@ -103,7 +103,7 @@
  	if (options.kerberos_authentication == 1) {
  		int ret = auth_krb5_password(authctxt, password);
  		if (ret == 1 || ret == 0)
@@ -109,10 +118,7 @@
  		/* Fall back to ordinary passwd authentication. */
  	}
  #endif
- #ifdef HAVE_CYGWIN
- 	{
- 		HANDLE hToken = cygwin_logon_user(pw, password);
- 
+@@ -114,10 +114,13 @@
  		if (hToken == INVALID_HANDLE_VALUE)
  			return 0;
  		cygwin_set_impersonation_token(hToken);
@@ -127,11 +133,7 @@
  	if (options.use_pam)
  		return (sshpam_auth_passwd(authctxt, password) && ok);
  #endif
- #if defined(USE_SHADOW) && defined(HAS_SHADOW_EXPIRE)
- 	if (!expire_checked) {
-@@ -123,11 +126,11 @@
- 	}
- #endif
+@@ -131,7 +134,7 @@
  	result = sys_auth_passwd(authctxt, password);
  	if (authctxt->force_pwchange)
  		disable_forwarding();
@@ -140,36 +142,3 @@
  }
  
  #ifdef BSD_AUTH
- static void
- warn_expiry(Authctxt *authctxt, auth_session_t *as)
---- openssh-6.6p1.orig/auth2.c	2016-06-30 11:24:05.386016011 -0700
-+++ openssh-6.6p1/auth2.c	2016-06-30 11:28:52.929336181 -0700
-@@ -301,13 +301,25 @@
-     const char *submethod)
- {
- 	char *methods;
- 	int partial = 0;
- 
--	if (!authctxt->valid && authenticated)
--		fatal("INTERNAL ERROR: authenticated invalid user %s",
--		    authctxt->user);
-+	/*
-+	 * The following code will normally check invalid user at this point
-+	 * but we disable it. We would actually need to call getpwnam() here
-+	 * to re-probe the user after PAM auth. But this is a privilege
-+	 * separated child running in chroot. There is no way to probe. The
-+	 * other guy is waiting for the response so we cannot just call
-+	 * PRIVSEP(getpwnamallow). It confuses the protocol sequencing. So
-+	 * just ignore and carry on. It does not have fatal consequences
-+	 * since the user is also checked in the other process and that guy
-+	 * will bail if it can't fnd the user even after successful PAM
-+	 * auth.
-+	 *if (!authctxt->valid && authenticated)
-+	 *	fatal("INTERNAL ERROR: authenticated invalid user %s",
-+	 *	    authctxt->user);
-+	 */
- 	if (authenticated && authctxt->postponed)
- 		fatal("INTERNAL ERROR: authenticated and postponed");
- 
- 	/* Special handling for root */
- 	if (authenticated && authctxt->pw->pw_uid == 0 &&
