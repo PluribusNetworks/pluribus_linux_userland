@@ -1,0 +1,7 @@
+Package: python-terminaltables
+Source: terminaltables
+Version: 3.1.0
+Architecture: all
+Section: python
+Priority: optional
+Homepage: https://github.com/Robpol86/terminaltables

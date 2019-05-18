@@ -1,0 +1,5 @@
+VMware vSphere Python SDK - Python 2.x
+  pyVmomi is the Python SDK for the VMware vSphere API that allows you to
+  automate actions on VMware ESX, ESXi, and vCenter servers.
+  .
+  This package contains the Python 2.x module.

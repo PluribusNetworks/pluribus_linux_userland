@@ -1,0 +1,9 @@
+Python library for printing tables to the console
+  Easily draw tables in terminal/console applications from a list of lists of
+  strings.
+  .
+  Supports: multi-line rows, table titles, POSIX and Windows, Wide CJK
+  (Chinese/Japanese/Korean) characters are displayed correctly, RTL Arabic and
+  Hebrew characters are aligned correctly, alignment and justification.
+  Colored text is supported through colorclass, colorama, termcolor, or just
+  plain ANSI escape codes.

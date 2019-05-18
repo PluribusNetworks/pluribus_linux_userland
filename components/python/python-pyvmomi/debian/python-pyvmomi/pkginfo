@@ -1,0 +1,7 @@
+Package: python-pyvmomi
+Version: 6.5.0
+Architecture: all
+Suggests: python-pyvmomi-doc
+Section: python
+Priority: optional
+Homepage: https://github.com/vmware/pyvmomi
