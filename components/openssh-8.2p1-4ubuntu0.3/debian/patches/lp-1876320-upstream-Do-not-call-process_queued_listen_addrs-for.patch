@@ -1,0 +1,59 @@
+From 0a9a611619b0a1fecd0195ec86a9885f5d681c84 Mon Sep 17 00:00:00 2001
+From: "djm@openbsd.org" <djm@openbsd.org>
+Date: Wed, 27 May 2020 21:59:11 +0000
+Subject: [PATCH] upstream: Do not call process_queued_listen_addrs() for every
+
+included file from sshd_config; patch from Jakub Jelen
+
+OpenBSD-Commit-ID: 0ff603d6f06a7fab4881f12503b53024799d0a49
+
+Backport-Note:
+  upstreams auto-tagging at the top of the file didn't
+  match, everything else applied as-is
+
+Origin: backport, https://anongit.mindrot.org/openssh.git/commit/?id=0a9a611619b0a1fecd0195ec86a9885f5d681c84
+Bug-Ubuntu: https://bugs.launchpad.net/bugs/1876320
+Last-Update: 2020-05-29
+
+---
+ servconf.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+--- a/servconf.c
++++ b/servconf.c
+@@ -75,8 +75,8 @@ static void add_listen_addr(ServerOption
+     const char *, int);
+ static void add_one_listen_addr(ServerOptions *, const char *,
+     const char *, int);
+-void parse_server_config_depth(ServerOptions *options, const char *filename,
+-    struct sshbuf *conf, struct include_list *includes,
++static void parse_server_config_depth(ServerOptions *options,
++    const char *filename, struct sshbuf *conf, struct include_list *includes,
+     struct connection_info *connectinfo, int flags, int *activep, int depth);
+ 
+ /* Use of privilege separation or not */
+@@ -2611,7 +2611,7 @@ copy_set_server_options(ServerOptions *d
+ #undef M_CP_STRARRAYOPT
+ 
+ #define SERVCONF_MAX_DEPTH	16
+-void
++static void
+ parse_server_config_depth(ServerOptions *options, const char *filename,
+     struct sshbuf *conf, struct include_list *includes,
+     struct connection_info *connectinfo, int flags, int *activep, int depth)
+@@ -2637,7 +2637,6 @@ parse_server_config_depth(ServerOptions
+ 	if (bad_options > 0)
+ 		fatal("%s: terminating, %d bad configuration options",
+ 		    filename, bad_options);
+-	process_queued_listen_addrs(options);
+ }
+ 
+ void
+@@ -2648,6 +2647,7 @@ parse_server_config(ServerOptions *optio
+ 	int active = connectinfo ? 0 : 1;
+ 	parse_server_config_depth(options, filename, conf, includes,
+ 	    connectinfo, 0, &active, 0);
++	process_queued_listen_addrs(options);
+ }
+ 
+ static const char *
