@@ -1,0 +1,38 @@
+#!/bin/sh
+set -e
+
+MYNAME="${0##*/}"
+
+report() { echo "${MYNAME}: $*" ; }
+report_warn() { report "Warning: $*" >&2 ; }
+report_err() { report "Error: $*" >&2 ; }
+
+if [ "$1" = configure ]; then
+  addgroup --quiet --system netdev || true
+fi
+
+# Generic stuff done on all configurations
+if [ "$1" = "configure" ] ; then
+  # We don't need loopback interface definition anymore as
+  # ifupdown handles loopback interface on its own from now
+  if [ ! -f /etc/network/interfaces ] ; then
+    if [ -z "$2" ]; then
+      echo "Creating /etc/network/interfaces."
+      echo "# interfaces(5) file used by ifup(8) and ifdown(8)" > /etc/network/interfaces
+      echo "# Include files from /etc/network/interfaces.d:" >> /etc/network/interfaces
+      echo "source-directory /etc/network/interfaces.d" >> /etc/network/interfaces
+    else
+      report_warn "/etc/network/interfaces does not exist"
+    fi
+  fi
+fi
+
+# Bring back missing /etc/rcS.d/networking symlink, to clean up after old broken upgrades
+# update-rc.d disable creates a K?? symlink, keep it disabled in that case
+# Drop after 16.04 LTS
+if dpkg --compare-versions "$2" lt-nl "0.7.48.1ubuntu8" && ! test -L /etc/rcS.d/*networking; then
+    echo "Re-enabling /etc/init.d/networking..."
+    update-rc.d networking remove && update-rc.d networking defaults || true
+fi
+
+#DEBHELPER#

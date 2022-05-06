@@ -1,0 +1,5 @@
+settle-dad.sh: necessary for static addresses? Ignore timeouts?
+select_interfaces(): why disallow ifquery --all? Manpage says it's fine.
+read_all_state(): locking?
+"Ignoring unknown interface %s=%s": why not return an error?
+do_interface(): success, okay, failed, choose one?

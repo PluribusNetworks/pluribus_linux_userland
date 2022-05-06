@@ -1,0 +1,38 @@
+#!/usr/bin/make -f
+
+export VERSION := $(shell dpkg-parsechangelog|grep Version|cut -d' ' -f2|sed s/.*really//g)
+export CFLAGS := -Wall -W -Wno-unused-parameter $(shell dpkg-buildflags --get CFLAGS) $(shell dpkg-buildflags --get CPPFLAGS) -D'IFUPDOWN_VERSION="$(VERSION)"'
+export LDFLAGS := $(shell dpkg-buildflags --get LDFLAGS)
+ifeq "$(origin CC)" "default"
+export CC := $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)-gcc
+endif
+export ARCH := $(shell dpkg-architecture -qDEB_HOST_ARCH_OS)
+export DESTDIR := debian/$(shell dh_listpackages)
+
+ifeq "$(ARCH)" "kfreebsd"
+CFLAGS += -D'LO_IFACE="lo0"'
+endif
+
+%:
+	dh $@ --parallel --with systemd
+
+override_dh_installinit:
+	dh_installinit --name=networking --no-start
+	install -p -m 0644 debian/networking.defaults $(DESTDIR)/etc/default/networking
+	dh_installinit --name=network-interface-container --noscripts
+	dh_installinit --name=network-interface-security --noscripts
+	dh_installinit --name=network-interface --noscripts
+	dh_installinit --name=networking --noscripts
+	dh_installinit --name=ifup@ --noscripts
+
+override_dh_installifupdown:
+	dh_installifupdown --name=upstart
+
+override_dh_auto_clean:
+	$(MAKE) clean
+
+override_dh_systemd_enable:
+	dh_systemd_enable --name=networking
+
+override_dh_installudev:
+	dh_installudev --priority=80

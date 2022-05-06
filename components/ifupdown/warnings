@@ -1,0 +1,123 @@
+main.c:196:20: warning: ‘read_state’ defined but not used [-Wunused-function]
+ static const char *read_state(const char *iface) {
+                    ^
+execute.c: In function ‘execute_scripts’:
+execute.c:168:44: warning: unused parameter ‘ifd’ [-Wunused-parameter]
+ static int execute_scripts(interface_defn *ifd, execfn *exec, char *opt) {
+                                            ^
+config.c: In function ‘add_allow_up’:
+config.c:179:61: warning: unused parameter ‘line’ [-Wunused-parameter]
+ static allowup_defn *add_allow_up(const char *filename, int line, allowup_defn *allow_up, const char *iface_name) {
+                                                             ^
+inet.c: In function ‘_manual_up’:
+inet.c:69:39: warning: unused parameter ‘ifd’ [-Wunused-parameter]
+ static int _manual_up(interface_defn *ifd, execfn *exec) {
+                                       ^
+inet.c:69:52: warning: unused parameter ‘exec’ [-Wunused-parameter]
+ static int _manual_up(interface_defn *ifd, execfn *exec) {
+                                                    ^
+inet.c: In function ‘_manual_down’:
+inet.c:72:41: warning: unused parameter ‘ifd’ [-Wunused-parameter]
+ static int _manual_down(interface_defn *ifd, execfn *exec) {
+                                         ^
+inet.c:72:54: warning: unused parameter ‘exec’ [-Wunused-parameter]
+ static int _manual_down(interface_defn *ifd, execfn *exec) {
+                                                      ^
+inet6.c: In function ‘_manual_up’:
+inet6.c:127:39: warning: unused parameter ‘ifd’ [-Wunused-parameter]
+ static int _manual_up(interface_defn *ifd, execfn *exec) {
+                                       ^
+inet6.c:127:52: warning: unused parameter ‘exec’ [-Wunused-parameter]
+ static int _manual_up(interface_defn *ifd, execfn *exec) {
+                                                    ^
+inet6.c: In function ‘_manual_down’:
+inet6.c:130:41: warning: unused parameter ‘ifd’ [-Wunused-parameter]
+ static int _manual_down(interface_defn *ifd, execfn *exec) {
+                                         ^
+inet6.c:130:54: warning: unused parameter ‘exec’ [-Wunused-parameter]
+ static int _manual_down(interface_defn *ifd, execfn *exec) {
+                                                      ^
+archcommon.c: In function ‘cleanup_hwaddress’:
+archcommon.c:32:40: warning: unused parameter ‘ifd’ [-Wunused-parameter]
+ void cleanup_hwaddress(interface_defn *ifd, char **pparam, int argc, char **argv) {
+                                        ^
+archcommon.c:32:64: warning: unused parameter ‘argc’ [-Wunused-parameter]
+ void cleanup_hwaddress(interface_defn *ifd, char **pparam, int argc, char **argv) {
+                                                                ^
+archcommon.c:32:77: warning: unused parameter ‘argv’ [-Wunused-parameter]
+ void cleanup_hwaddress(interface_defn *ifd, char **pparam, int argc, char **argv) {
+                                                                             ^
+archcommon.c: In function ‘make_hex_address’:
+archcommon.c:48:39: warning: unused parameter ‘ifd’ [-Wunused-parameter]
+ void make_hex_address(interface_defn *ifd, char **pparam, int argc, char **argv) {
+                                       ^
+archcommon.c:48:63: warning: unused parameter ‘argc’ [-Wunused-parameter]
+ void make_hex_address(interface_defn *ifd, char **pparam, int argc, char **argv) {
+                                                               ^
+archcommon.c:48:76: warning: unused parameter ‘argv’ [-Wunused-parameter]
+ void make_hex_address(interface_defn *ifd, char **pparam, int argc, char **argv) {
+                                                                            ^
+archcommon.c: In function ‘compute_v4_addr’:
+archcommon.c:62:38: warning: unused parameter ‘ifd’ [-Wunused-parameter]
+ void compute_v4_addr(interface_defn *ifd, char **pparam, int argc, char **argv) {
+                                      ^
+archcommon.c:62:62: warning: unused parameter ‘argc’ [-Wunused-parameter]
+ void compute_v4_addr(interface_defn *ifd, char **pparam, int argc, char **argv) {
+                                                              ^
+archcommon.c:62:75: warning: unused parameter ‘argv’ [-Wunused-parameter]
+ void compute_v4_addr(interface_defn *ifd, char **pparam, int argc, char **argv) {
+                                                                           ^
+archcommon.c: In function ‘compute_v4_mask’:
+archcommon.c:78:38: warning: unused parameter ‘ifd’ [-Wunused-parameter]
+ void compute_v4_mask(interface_defn *ifd, char **pparam, int argc, char **argv) {
+                                      ^
+archcommon.c:78:62: warning: unused parameter ‘argc’ [-Wunused-parameter]
+ void compute_v4_mask(interface_defn *ifd, char **pparam, int argc, char **argv) {
+                                                              ^
+archcommon.c:78:75: warning: unused parameter ‘argv’ [-Wunused-parameter]
+ void compute_v4_mask(interface_defn *ifd, char **pparam, int argc, char **argv) {
+                                                                           ^
+archcommon.c: In function ‘compute_v4_broadcast’:
+archcommon.c:129:67: warning: unused parameter ‘argc’ [-Wunused-parameter]
+ void compute_v4_broadcast(interface_defn *ifd, char **pparam, int argc, char **argv) {
+                                                                   ^
+archcommon.c:129:80: warning: unused parameter ‘argv’ [-Wunused-parameter]
+ void compute_v4_broadcast(interface_defn *ifd, char **pparam, int argc, char **argv) {
+                                                                                ^
+archcommon.c: In function ‘set_preferred_lft’:
+archcommon.c:180:64: warning: unused parameter ‘argc’ [-Wunused-parameter]
+ void set_preferred_lft(interface_defn *ifd, char **pparam, int argc, char **argv) {
+                                                                ^
+archcommon.c:180:77: warning: unused parameter ‘argv’ [-Wunused-parameter]
+ void set_preferred_lft(interface_defn *ifd, char **pparam, int argc, char **argv) {
+                                                                             ^
+archcommon.c: In function ‘get_token’:
+archcommon.c:194:32: warning: unused parameter ‘ifd’ [-Wunused-parameter]
+ void get_token(interface_defn *ifd, char **pparam, int argc, char **argv) {
+                                ^
+archcommon.c: In function ‘to_decimal’:
+archcommon.c:228:33: warning: unused parameter ‘ifd’ [-Wunused-parameter]
+ void to_decimal(interface_defn *ifd, char **pparam, int argc, char **argv) {
+                                 ^
+archcommon.c: In function ‘map_value’:
+archcommon.c:243:32: warning: unused parameter ‘ifd’ [-Wunused-parameter]
+ void map_value(interface_defn *ifd, char **pparam, int argc, char **argv) {
+                                ^
+archcommon.c: In function ‘if_set’:
+archcommon.c:262:29: warning: unused parameter ‘ifd’ [-Wunused-parameter]
+ void if_set(interface_defn *ifd, char **pparam, int argc, char **argv) {
+                             ^
+meta.c: In function ‘_none_up’:
+meta.c:15:37: warning: unused parameter ‘ifd’ [-Wunused-parameter]
+ static int _none_up(interface_defn *ifd, execfn *exec) {
+                                     ^
+meta.c:15:50: warning: unused parameter ‘exec’ [-Wunused-parameter]
+ static int _none_up(interface_defn *ifd, execfn *exec) {
+                                                  ^
+meta.c: In function ‘_none_down’:
+meta.c:18:39: warning: unused parameter ‘ifd’ [-Wunused-parameter]
+ static int _none_down(interface_defn *ifd, execfn *exec) {
+                                       ^
+meta.c:18:52: warning: unused parameter ‘exec’ [-Wunused-parameter]
+ static int _none_down(interface_defn *ifd, execfn *exec) {
+                                                    ^

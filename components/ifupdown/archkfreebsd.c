@@ -1,0 +1,1 @@
+/* No kFreeBSD specific functions. */
