@@ -1,0 +1,191 @@
+diff -ru lxc-2.0.8/Makefile nv-lxc-2.0.8/Makefile
+--- lxc-2.0.8/Makefile	2020-11-12 04:10:09.000000000 -0800
++++ nv-lxc-2.0.8/Makefile	2020-12-15 21:20:27.258735014 -0800
+@@ -440,7 +440,8 @@
+ top_builddir = .
+ top_srcdir = .
+ ACLOCAL_AMFLAGS = -I config
+-SUBDIRS = config src templates doc hooks
++#SUBDIRS = config src templates doc hooks
++SUBDIRS = config src
+ DIST_SUBDIRS = config src templates doc hooks
+ EXTRA_DIST = \
+ 	autogen.sh \
+diff -ru lxc-2.0.8/src/Makefile nv-lxc-2.0.8/src/Makefile
+--- lxc-2.0.8/src/Makefile	2020-11-11 05:56:25.000000000 -0800
++++ nv-lxc-2.0.8/src/Makefile	2020-12-15 22:05:03.359876147 -0800
+@@ -378,7 +378,8 @@
+ top_build_prefix = ../
+ top_builddir = ..
+ top_srcdir = ..
+-SUBDIRS = lxc tests python-lxc lua-lxc
++#SUBDIRS = lxc tests python-lxc lua-lxc
++SUBDIRS = lxc
+ all: config.h
+ 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
+ 
+diff -ru lxc-2.0.8/src/lxc/Makefile nv-lxc-2.0.8/src/lxc/Makefile
+--- lxc-2.0.8/src/lxc/Makefile	2020-11-12 04:02:29.000000000 -0800
++++ nv-lxc-2.0.8/src/lxc/Makefile	2020-12-15 22:00:14.223855696 -0800
+@@ -489,7 +489,7 @@
+ AUTOMAKE = ${SHELL} /home/nnakano/Downloads/lxc/lxc-2.0.8/config/missing automake-1.15
+ AWK = gawk
+ BINDIR = /usr/bin
+-CAP_LIBS = -lcap
++CAP_LIBS = -L../../../lib -lcap
+ CC = gcc
+ CCDEPMODE = depmode=none
+ CFLAGS = -g -O2 -fPIE -fstack-protector-strong -Wformat -Werror=format-security -Wall -Werror
+@@ -502,7 +502,7 @@
+ DBUS_CFLAGS = 
+ DBUS_LIBS = 
+ DEFAULT_CGROUP_PATTERN = /lxc/%n
+-DEFS = -DHAVE_CONFIG_H
++DEFS = -DPLURIBUS -DHAVE_CONFIG_H -I../../../inc
+ DEPDIR = .deps
+ DLLTOOL = false
+ DOCDIR = /usr/share/doc/lxc
+@@ -528,7 +528,7 @@
+ LIBDIR = /usr/lib/x86_64-linux-gnu
+ LIBEXECDIR = /usr/lib/x86_64-linux-gnu
+ LIBOBJS = 
+-LIBS = -lutil -lpthread -lcap -lgnutls -lapparmor 
++LIBS = -lutil -lpthread $(CAP_LIBS) -lgnutls -lapparmor 
+ LIBTOOL = $(SHELL) $(top_builddir)/libtool
+ LIBTOOL_DEPS = config/ltmain.sh
+ LIPO = 
+diff -ru lxc-2.0.8/src/lxc/conf.c nv-lxc-2.0.8/src/lxc/conf.c
+--- lxc-2.0.8/src/lxc/conf.c	2017-05-11 10:23:06.000000000 -0700
++++ nv-lxc-2.0.8/src/lxc/conf.c	2020-12-15 21:20:27.317735018 -0800
+@@ -2650,7 +2650,12 @@
+ 		if (handler->conf->reboot)
+ 			lxc_netdev_delete_by_name(veth1);
+ 	} else {
++#ifdef PLURIBUS
++		err = snprintf(veth1buf, sizeof(veth1buf),
++		    "veth%05dXXXXXX", getpid());
++#else
+ 		err = snprintf(veth1buf, sizeof(veth1buf), "vethXXXXXX");
++#endif
+ 		if (err >= sizeof(veth1buf)) { /* can't *really* happen, but... */
+ 			ERROR("veth1 name too long");
+ 			return -1;
+@@ -2664,7 +2669,11 @@
+ 		memcpy(netdev->priv.veth_attr.veth1, veth1, IFNAMSIZ);
+ 	}
+ 
++#ifdef PLURIBUS
++	snprintf(veth2buf, sizeof(veth2buf), "veth%05dXXXXXX", getpid());
++#else
+ 	snprintf(veth2buf, sizeof(veth2buf), "vethXXXXXX");
++#endif
+ 	veth2 = lxc_mkifname(veth2buf);
+ 	if (!veth2) {
+ 		ERROR("failed to allocate a temporary name");
+@@ -2786,7 +2795,11 @@
+ 		return -1;
+ 	}
+ 
++#ifdef PLURIBUS
++	err = snprintf(peerbuf, sizeof(peerbuf), "mc%05dXXXXXX", getpid());
++#else
+ 	err = snprintf(peerbuf, sizeof(peerbuf), "mcXXXXXX");
++#endif
+ 	if (err >= sizeof(peerbuf))
+ 		return -1;
+ 
+diff -ru lxc-2.0.8/src/lxc/criu.c nv-lxc-2.0.8/src/lxc/criu.c
+--- lxc-2.0.8/src/lxc/criu.c	2017-05-11 10:23:06.000000000 -0700
++++ nv-lxc-2.0.8/src/lxc/criu.c	2020-12-15 21:20:27.321735018 -0800
+@@ -758,7 +758,12 @@
+ 		if (netdev->type != LXC_NET_VETH)
+ 			continue;
+ 
++#ifdef PLURIBUS
++		snprintf(template, sizeof(template), "veth%06dXXXXXX",
++		    getpid());
++#else
+ 		snprintf(template, sizeof(template), "vethXXXXXX");
++#endif
+ 
+ 		if (!netdev->priv.veth_attr.pair)
+ 			netdev->priv.veth_attr.pair = lxc_mkifname(template);
+diff -ru lxc-2.0.8/src/lxc/lxc_user_nic.c nv-lxc-2.0.8/src/lxc/lxc_user_nic.c
+--- lxc-2.0.8/src/lxc/lxc_user_nic.c	2017-05-11 10:23:06.000000000 -0700
++++ nv-lxc-2.0.8/src/lxc/lxc_user_nic.c	2020-12-15 21:20:27.325735019 -0800
+@@ -520,7 +520,11 @@
+ 	int ret;
+ 	char template[IFNAMSIZ];
+ 
++#ifdef PLURIBUS
++	ret = snprintf(template, sizeof(template), "veth%05dXXXXXX", getpid());
++#else
+ 	ret = snprintf(template, sizeof(template), "vethXXXXXX");
++#endif
+ 	if (ret < 0 || (size_t)ret >= sizeof(template))
+ 		return false;
+ 
+diff -ru lxc-2.0.8/src/lxc/network.c nv-lxc-2.0.8/src/lxc/network.c
+--- lxc-2.0.8/src/lxc/network.c	2017-05-11 10:23:06.000000000 -0700
++++ nv-lxc-2.0.8/src/lxc/network.c	2020-12-15 21:20:27.333735019 -0800
+@@ -1504,6 +1504,52 @@
+ static const char padchar[] =
+ "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+ 
++#ifdef PLURIBUS
++char *lxc_mkifname(char *template)
++{
++	char *name;
++	size_t i = 0, len;
++	int r;
++	FILE *urandom;
++	unsigned int seed;
++
++	/* Initialize the random number generator */
++	urandom = fopen ("/dev/urandom", "r");
++	if (urandom != NULL) {
++		if (fread (&seed, sizeof(seed), 1, urandom) <= 0)
++			seed = time(0);
++		fclose(urandom);
++	} else {
++		seed = time(0);
++	}
++
++#ifndef HAVE_RAND_R
++	srand(seed);
++#endif
++	len = strlen(template);
++
++	if ((name = malloc(len + 1)) == NULL) {
++		return NULL;
++	}
++	do {
++		(void) strcpy(name, template);
++		for (i = 0; i < len; i++) {
++			if (name[i] == 'X') {
++#ifdef HAVE_RAND_R
++				r = rand_r(&seed);
++#else
++				r = rand();
++#endif
++				name[i] = padchar[r % (sizeof (padchar) - 1)];
++			}
++		}
++		name[i] = '\0';
++	} while (if_nametoindex(name) != 0);
++	return (name);
++}
++
++#else /* PLURIBUS */
++
+ char *lxc_mkifname(char *template)
+ {
+ 	char *name = NULL;
+@@ -1564,6 +1610,7 @@
+ 	freeifaddrs(ifaddr);
+ 	return name;
+ }
++#endif /* PLURIBUS */
+ 
+ int setup_private_host_hw_addr(char *veth1)
+ {

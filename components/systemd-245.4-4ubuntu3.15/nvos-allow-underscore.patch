@@ -1,0 +1,12 @@
+diff -ur systemd-245.4-4ubuntu3.7/src/basic/hostname-util.c systemd-245.4-4ubuntu3.7.new/src/basic/hostname-util.c
+--- systemd-245.4-4ubuntu3.7/src/basic/hostname-util.c	2020-04-01 10:23:42.000000000 -0700
++++ systemd-245.4-4ubuntu3.7.new/src/basic/hostname-util.c	2021-08-25 21:18:35.359782799 -0700
+@@ -73,7 +73,7 @@
+                 (c >= 'a' && c <= 'z') ||
+                 (c >= 'A' && c <= 'Z') ||
+                 (c >= '0' && c <= '9') ||
+-                c == '-';
++                c == '-' || c == '_';
+ }
+ 
+ /**
