@@ -1,0 +1,12 @@
+--- openssh-8.2p1-4ubuntu0.3/debian/changelog	2021-11-24 22:56:35.272617982 -0800
++++ openssh-8.2p1-4ubuntu0.3-new/debian/changelog	2021-11-24 22:55:53.020602601 -0800
+@@ -1,3 +1,9 @@
++openssh (1:8.2p1-4ubuntu0.3-pluribus1) focal; urgency=medium
++
++  * adding pluribus suffix
++
++ -- Jenkins <jenkins@pluribusnetworks.com>  Wed, 24 Nov 2021 22:54:30 -0800 
++
+ openssh (1:8.2p1-4ubuntu0.3) focal; urgency=medium
+ 
+   * d/systemd/ssh@.service: preserve the systemd managed runtime directory to

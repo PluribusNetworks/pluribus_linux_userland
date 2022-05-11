@@ -1,0 +1,174 @@
+diff -u -r openssh-8.2p1/auth-pam.c openssh-8.2p1.new/auth-pam.c
+--- openssh-8.2p1/auth-pam.c	2020-02-13 16:40:54.000000000 -0800
++++ openssh-8.2p1.new/auth-pam.c	2021-06-20 19:54:42.858236792 -0700
+@@ -898,8 +898,7 @@
+ 				**prompts = NULL;
+ 			}
+ 			if (type == PAM_SUCCESS) {
+-				if (!sshpam_authctxt->valid ||
+-				    (sshpam_authctxt->pw->pw_uid == 0 &&
++				if ((sshpam_authctxt->pw->pw_uid == 0 &&
+ 				    options.permit_root_login != PERMIT_YES))
+ 					fatal("Internal error: PAM auth "
+ 					    "succeeded when it should have "
+@@ -978,9 +977,8 @@
+ 	}
+ 	if ((buffer = sshbuf_new()) == NULL)
+ 		fatal("%s: sshbuf_new failed", __func__);
+-	if (sshpam_authctxt->valid &&
+-	    (sshpam_authctxt->pw->pw_uid != 0 ||
+-	    options.permit_root_login == PERMIT_YES)) {
++	if (sshpam_authctxt->pw->pw_uid != 0 ||
++	    options.permit_root_login == PERMIT_YES) {
+ 		if ((r = sshbuf_put_cstring(buffer, *resp)) != 0)
+ 			fatal("%s: buffer error: %s", __func__, ssh_err(r));
+ 	} else {
+@@ -1323,8 +1321,9 @@
+  * Attempt password authentication via PAM
+  */
+ int
+-sshpam_auth_passwd(Authctxt *authctxt, const char *password)
++sshpam_auth_passwd(struct ssh *ssh, const char *password)
+ {
++	Authctxt *authctxt = (Authctxt *)ssh->authctxt;
+ 	int flags = (options.permit_empty_passwd == 0 ?
+ 	    PAM_DISALLOW_NULL_AUTHTOK : 0);
+ 	char *fake = NULL;
+@@ -1341,8 +1340,8 @@
+ 	 * by PermitRootLogin, use an invalid password to prevent leaking
+ 	 * information via timing (eg if the PAM config has a delay on fail).
+ 	 */
+-	if (!authctxt->valid || (authctxt->pw->pw_uid == 0 &&
+-	    options.permit_root_login != PERMIT_YES))
++	if (authctxt->pw->pw_uid == 0 &&
++	    options.permit_root_login != PERMIT_YES)
+ 		sshpam_password = fake = fake_password(password);
+ 
+ 	sshpam_err = pam_set_item(sshpam_handle, PAM_CONV,
+@@ -1356,10 +1355,34 @@
+ 	free(fake);
+ 	if (sshpam_err == PAM_MAXTRIES)
+ 		sshpam_set_maxtries_reached(1);
+-	if (sshpam_err == PAM_SUCCESS && authctxt->valid) {
+-		debug("PAM: password authentication accepted for %.100s",
+-		    authctxt->user);
+-		return 1;
++	if (sshpam_err == PAM_SUCCESS) {
++		struct passwd *fpw, *pw;
++ 		debug("PAM: password authentication accepted for %.100s",
++ 		    authctxt->user);
++
++		/*
++		 * At this point re-probe user that was not found earlier
++		 * if this is fakepw().
++		 */
++		fpw = fakepw();
++		pw = authctxt->pw;
++		if (!authctxt->valid &&
++		    strcmp(pw->pw_name, fpw->pw_name) == 0 &&
++		    strcmp(pw->pw_gecos, fpw->pw_gecos) == 0 &&
++		    strcmp(pw->pw_shell, fpw->pw_shell) == 0) {
++			debug("Re-attempting user check");
++			pw = getpwnamallow(ssh, authctxt->user);
++			if (pw == NULL) {
++				debug("User %s not found even after PAM auth.",
++				    authctxt->user);
++				return 0;
++			} else {
++				authctxt->pw = pw;
++				authctxt->valid = 1;
++				debug("User record valid after authentication");
++			}
++		}
++ 		return 1;
+ 	} else {
+ 		debug("PAM: password authentication failed for %.100s: %s",
+ 		    authctxt->valid ? authctxt->user : "an illegal user",
+diff -u -r openssh-8.2p1/auth-pam.h openssh-8.2p1.new/auth-pam.h
+--- openssh-8.2p1/auth-pam.h	2020-02-13 16:40:54.000000000 -0800
++++ openssh-8.2p1.new/auth-pam.h	2021-06-20 19:54:00.541233799 -0700
+@@ -39,7 +39,7 @@
+ void free_pam_environment(char **);
+ void sshpam_thread_cleanup(void);
+ void sshpam_cleanup(void);
+-int sshpam_auth_passwd(Authctxt *, const char *);
++int sshpam_auth_passwd(struct ssh *, const char *);
+ int sshpam_get_maxtries_reached(void);
+ void sshpam_set_maxtries_reached(int);
+ int is_pam_session_open(void);
+diff -u -r openssh-8.2p1/auth-passwd.c openssh-8.2p1.new/auth-passwd.c
+--- openssh-8.2p1/auth-passwd.c	2020-02-13 16:40:54.000000000 -0800
++++ openssh-8.2p1.new/auth-passwd.c	2021-06-20 19:52:08.314225862 -0700
+@@ -78,7 +78,7 @@
+ {
+ 	Authctxt *authctxt = ssh->authctxt;
+ 	struct passwd *pw = authctxt->pw;
+-	int result, ok = authctxt->valid;
++	int result, ok = 1;
+ #if defined(USE_SHADOW) && defined(HAS_SHADOW_EXPIRE)
+ 	static int expire_checked = 0;
+ #endif
+@@ -97,7 +97,7 @@
+ 	if (options.kerberos_authentication == 1) {
+ 		int ret = auth_krb5_password(authctxt, password);
+ 		if (ret == 1 || ret == 0)
+-			return ret && ok;
++			return ret && ok && authctxt->valid;
+ 		/* Fall back to ordinary passwd authentication. */
+ 	}
+ #endif
+@@ -108,12 +108,15 @@
+ 		if (hToken == INVALID_HANDLE_VALUE)
+ 			return 0;
+ 		cygwin_set_impersonation_token(hToken);
+-		return ok;
++		return ok && authctxt->valid;
+ 	}
+ #endif
+ #ifdef USE_PAM
++	/*
++	 * Ignore authctxt->valid for PAM. We will re-probe user.
++	 */
+ 	if (options.use_pam)
+-		return (sshpam_auth_passwd(authctxt, password) && ok);
++		return (sshpam_auth_passwd(ssh, password) && ok);
+ #endif
+ #if defined(USE_SHADOW) && defined(HAS_SHADOW_EXPIRE)
+ 	if (!expire_checked) {
+@@ -125,7 +128,7 @@
+ 	result = sys_auth_passwd(ssh, password);
+ 	if (authctxt->force_pwchange)
+ 		auth_restrict_session(ssh);
+-	return (result && ok);
++	return (result && ok && authctxt->valid);
+ }
+ 
+ #ifdef BSD_AUTH
+diff -u -r openssh-8.2p1/auth2.c openssh-8.2p1.new/auth2.c
+--- openssh-8.2p1/auth2.c	2021-06-13 23:43:16.000000000 -0700
++++ openssh-8.2p1.new/auth2.c	2021-06-16 19:46:44.546238700 -0700
+@@ -364,9 +364,21 @@
+ 	char *methods;
+ 	int r, partial = 0;
+ 
+-	if (!authctxt->valid && authenticated)
+-		fatal("INTERNAL ERROR: authenticated invalid user %s",
+-		    authctxt->user);
++	/*
++	 * The following code will normally check invalid user at this point
++	 * but we disable it. We would actually need to call getpwnam() here
++	 * to re-probe the user after PAM auth. But this is a privilege
++	 * separated child running in chroot. There is no way to probe. The
++	 * other guy is waiting for the response so we cannot just call
++	 * PRIVSEP(getpwnamallow). It confuses the protocol sequencing. So
++	 * just ignore and carry on. It does not have fatal consequences
++	 * since the user is also checked in the other process and that guy
++	 * will bail if it can't fnd the user even after successful PAM
++	 * auth.
++	 *if (!authctxt->valid && authenticated)
++	 *	fatal("INTERNAL ERROR: authenticated invalid user %s",
++	 *	    authctxt->user);
++	 */
+ 	if (authenticated && authctxt->postponed)
+ 		fatal("INTERNAL ERROR: authenticated and postponed");
+ 

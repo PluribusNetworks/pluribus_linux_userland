@@ -1,0 +1,442 @@
+diff -ur ifupdown/Makefile nv-ifupdown/Makefile
+--- ifupdown/Makefile	2016-11-30 09:16:19.000000000 -0800
++++ nv-ifupdown/Makefile	2020-05-19 23:29:37.474481512 -0700
+@@ -4,7 +4,7 @@
+ 
+ BASEDIR ?= $(DESTDIR)
+ 
+-CFLAGS += -std=c99 -D_DEFAULT_SOURCE
++CFLAGS += -std=c99 -D_DEFAULT_SOURCE -DPLURIBUS
+ CFLAGS += -D'IFUPDOWN_VERSION="$(VERSION)"'
+ 
+ DEFNFILES := inet.defn ipx.defn inet6.defn can.defn
+@@ -16,35 +16,33 @@
+ 
+ DEFNFILES += meta.defn link.defn
+ 
+-all : ifup ifdown ifquery ifup.8 ifdown.8 ifquery.8 interfaces.5
++all : nv-ifup nv-ifdown nv-ifquery
+ 
+ .PHONY : all clean distclean
+ .SECONDARY: link.c ipx.c can.c meta.c inet6.c inet.c
+ 
+ install :
+-	install -m 0755 -d     ${BASEDIR}/sbin
+-	install -m 0755 ifup   ${BASEDIR}/sbin
+-	ln -s /sbin/ifup ${BASEDIR}/sbin/ifdown
+-	ln -s /sbin/ifup ${BASEDIR}/sbin/ifquery
+-	install -D -m 0755 settle-dad.sh $(BASEDIR)/lib/ifupdown/settle-dad.sh
+-	install -D -m 0755 wait-for-ll6.sh $(BASEDIR)/lib/ifupdown/wait-for-ll6.sh
++	install -m 0755 -d     ${BASEDIR}/usr/sbin
++	install -m 0755 nv-ifup   ${BASEDIR}/usr/sbin
++	ln -sf nv-ifup ${BASEDIR}/usr/sbin/nv-ifdown
++	ln -sf nv-ifup ${BASEDIR}/usr/sbin/nv-ifquery
+ 
+ clean :
+ 	rm -f *.o $(patsubst %.defn,%.c,$(DEFNFILES)) *~
+ 	rm -f $(patsubst %.defn,%.man,$(DEFNFILES))
+-	rm -f ifup ifdown ifquery interfaces.5 ifdown.8 ifquery.8
++	rm -f nv-ifup nv-ifdown nv-ifquery interfaces.5 ifdown.8 ifquery.8
+ 	-rm -f ./tests/testcase.* ./tests/up*
+ 
+ distclean : clean
+ 
+-ifup: $(OBJ)
++nv-ifup: $(OBJ)
+ 	$(CC) $(CFLAGS) $^ $(LDFLAGS) $(OUTPUT_OPTION)
+ 
+-ifdown: ifup
+-	ln -sf ifup ifdown
++nv-ifdown: nv-ifup
++	ln -sf nv-ifup nv-ifdown
+ 
+-ifquery: ifup
+-	ln -sf ifup ifquery
++nv-ifquery: nv-ifup
++	ln -sf nv-ifup nv-ifquery
+ 
+ ARCH := $(shell dpkg-architecture -qDEB_HOST_ARCH_OS)
+ check:
+diff -ur ifupdown/config.c nv-ifupdown/config.c
+--- ifupdown/config.c	2016-11-30 09:16:19.000000000 -0800
++++ nv-ifupdown/config.c	2020-05-19 23:07:55.051389394 -0700
+@@ -12,6 +12,7 @@
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ #include <unistd.h>
++#include <limits.h>
+ 
+ #include "header.h"
+ 
+@@ -27,6 +28,78 @@
+ 	NULL
+ };
+ 
++#ifdef PLURIBUS
++static int
++get_line(char **result, size_t *result_len, FILE *f, int *linep)
++{
++	char	buf[LINE_MAX];
++	char	line[LINE_MAX];
++	size_t	line_len, len;
++	int	lineno = 0;
++	char	*s, *e;
++
++	line_len = 0;
++	while (fgets(buf, sizeof (buf), f) != NULL) {
++		lineno++;
++		s = buf;
++		/* remove blank spaces if it's the beginning of the line */
++		if (line_len == 0) {
++			while (isspace(*s)) s++;
++		}
++		if (*s == '#')
++			continue;
++		e = s;
++		while (*e != '\0' && *e != '#') e++;
++		if (*e == '#')
++			*e = '\0';
++		if ((len = e - s) == 0)
++			continue;
++		/* remove trailing spaces */
++		e--;
++		while (e != s && isspace(*e)) e--;
++		if (e == s)
++			continue;
++		*(e + 1) = '\0';
++		len = (e + 1) - s;
++
++		/* copy into temporary buffer */
++		if ((line_len + len) >= sizeof (line)) {
++			/* line too long */
++			return (0);
++		}
++		(void) memcpy(line + line_len, s, len);
++		line_len += len;
++		if (*e != '\\')
++			break;
++		/* remove backslash */
++		*e = '\0';
++		line_len--;
++	}
++
++	if (line_len == 0)
++		return (0);
++	line[line_len] = '\0';
++
++	/* store result */
++	*linep += lineno;
++	*result_len = line_len + 1;
++	*result = realloc(*result, line_len + 1);
++	(void) memcpy(*result, line, line_len + 1);
++	return (1);
++}
++
++unsigned int
++hash_key(const char *s)
++{
++	unsigned int hash = 7;
++
++	while (*s != '\0') {
++		hash = hash * 31 + *(unsigned char *)s;
++		s++;
++	}
++	return (hash % HASH_TABLE_SIZE);
++}
++#else
+ static int get_line(char **result, size_t *result_len, FILE *f, int *line) {
+ 	size_t pos;
+ 
+@@ -110,6 +183,7 @@
+ 
+ 	return 1;
+ }
++#endif
+ 
+ static char *next_word(char *buf, char *word, int maxlen) {
+ 	if (!buf)
+@@ -172,14 +246,23 @@
+ 
+ 		(*allowups)->when = strdup(name);
+ 	}
+-
+ 	return *allowups;
+ }
+ 
+ static allowup_defn *add_allow_up(const char *filename, int line, allowup_defn *allow_up, const char *iface_name) {
++#ifdef PLURIBUS
++	struct intname_defn *in;
++	int key = hash_key(iface_name);
++
++	for (in = allow_up->intname_hash[key]; in != NULL; in = in->next) {
++		if (strcmp(iface_name, in->name) == 0)
++			return (allow_up);
++	}
++#else
+ 	for (int i = 0; i < allow_up->n_interfaces; i++)
+ 		if (strcmp(iface_name, allow_up->interfaces[i]) == 0)
+ 			return allow_up;
++#endif
+ 
+ 	if (allow_up->n_interfaces == allow_up->max_interfaces) {
+ 		char **tmp;
+@@ -195,8 +278,15 @@
+ 
+ 		allow_up->interfaces = tmp;
+ 	}
+-
++#ifdef PLURIBUS
++	in = malloc(sizeof (struct intname_defn));
++	in->name = strdup(iface_name);
++	in->next = allow_up->intname_hash[key];
++	allow_up->intname_hash[key] = in;
++	allow_up->interfaces[allow_up->n_interfaces] = in->name;
++#else
+ 	allow_up->interfaces[allow_up->n_interfaces] = strdup(iface_name);
++#endif
+ 	allow_up->n_interfaces++;
+ 
+ 	return allow_up;
+@@ -346,7 +436,14 @@
+ }
+ 
+ static interface_defn *get_interface(interfaces_file *defn, const char *iface, const char *addr_fam) {
+-	for (interface_defn *currif = defn->ifaces; currif; currif = currif->next) {
++	interface_defn *currif;
++#ifdef PLURIBUS
++	int key = hash_key(iface);
++	currif = defn->ifaces[key];
++#else
++	currif = defn->ifaces;
++#endif
++	for (; currif; currif = currif->next) {
+ 		if (strcmp(iface, currif->logical_iface) == 0) {
+ 			/* addr_fam == NULL matches any address family */
+ 			if ((addr_fam == NULL) || (strcmp(addr_fam, currif->address_family->name) == 0))
+@@ -726,6 +823,11 @@
+ 			if (((!strcmp(address_family_name, "inet")) || (!strcmp(address_family_name, "inet6"))) && (!strcmp(method_name, "loopback")))
+ 				no_loopback = true;
+ 
++#ifdef PLURIBUS
++			int key = hash_key(iface_name);
++			currif->next = defn->ifaces[key];
++			defn->ifaces[key] = currif;
++#else
+ 			interface_defn **where = &defn->ifaces;
+ 
+ 			while (*where != NULL) {
+@@ -734,6 +836,7 @@
+ 
+ 			*where = currif;
+ 			currif->next = NULL;
++#endif
+ 			currently_processing = IFACE;
+ 		} else if (strcmp(firstword, "auto") == 0) {
+ 			allowup_defn *auto_ups = get_allowup(&defn->allowups, "auto");
+@@ -884,7 +987,14 @@
+ 			.next = defn->ifaces
+ 		};
+ 
++#ifdef PLURIBUS
++		int key = hash_key(LO_IFACE);
++		lo_if->next = defn->ifaces[key];
++		defn->ifaces[key] = lo_if;
++#else
++		lo_if->next = defn->ifaces;
+ 		defn->ifaces = lo_if;
++#endif
+ 	}
+ 
+ 	clear_seen();
+diff -ur ifupdown/execute.c nv-ifupdown/execute.c
+--- ifupdown/execute.c	2016-11-30 09:16:19.000000000 -0800
++++ nv-ifupdown/execute.c	2020-04-21 05:14:03.951492315 -0700
+@@ -502,7 +502,13 @@
+ }
+ 
+ bool var_set_anywhere(const char *id, interface_defn *ifd) {
+-	for (interface_defn *currif = defn->ifaces; currif; currif = currif->next) {
++#ifdef PLURIBUS
++	int key = hash_key(id);
++	interface_defn *currif = defn->ifaces[key];
++#else
++	interface_defn *currif = defn->ifaces;
++#endif
++	for (; currif; currif = currif->next) {
+ 		if (strcmp(ifd->logical_iface, currif->logical_iface) == 0) {
+ 			char *varvalue = get_var(id, strlen(id), currif);
+ 
+diff -ur ifupdown/header.h nv-ifupdown/header.h
+--- ifupdown/header.h	2016-11-30 09:16:19.000000000 -0800
++++ nv-ifupdown/header.h	2020-04-28 06:49:07.969147821 -0700
+@@ -42,12 +42,26 @@
+ 	char *value;
+ };
+ 
++#ifdef PLURIBUS
++#define	HASH_TABLE_SIZE	307
++extern unsigned int hash_key(const char *);
++#endif
++
+ struct interfaces_file {
+ 	allowup_defn *allowups;
++#ifdef PLURIBUS
++	interface_defn *ifaces[HASH_TABLE_SIZE];
++#else
+ 	interface_defn *ifaces;
++#endif
+ 	mapping_defn *mappings;
+ };
+ 
++struct intname_defn {
++	char *name;
++	struct intname_defn *next;
++};
++
+ struct allowup_defn {
+ 	allowup_defn *next;
+ 
+@@ -55,6 +69,9 @@
+ 	int max_interfaces;
+ 	int n_interfaces;
+ 	char **interfaces;
++#ifdef PLURIBUS
++	struct intname_defn *intname_hash[HASH_TABLE_SIZE];
++#endif
+ };
+ 
+ struct interface_defn {
+Only in ifupdown: log
+diff -ur ifupdown/main.c nv-ifupdown/main.c
+--- ifupdown/main.c	2016-11-30 09:16:19.000000000 -0800
++++ nv-ifupdown/main.c	2020-05-19 23:03:50.419372091 -0700
+@@ -400,12 +400,12 @@
+ 	else
+ 		command = argv0;	/* no /'s in argv0 */
+ 
+-	if (strcmp(command, "ifup") == 0) {
++	if (strcmp(command, "nv-ifup") == 0) {
+ 		return iface_up;
+-	} else if (strcmp(command, "ifdown") == 0) {
++	} else if (strcmp(command, "nv-ifdown") == 0) {
+ 		ignore_failures = true;
+ 		return iface_down;
+-	} else if (strcmp(command, "ifquery") == 0) {
++	} else if (strcmp(command, "nv-ifquery") == 0) {
+ 		no_act = true;
+ 		return iface_query;
+ 	} else {
+@@ -741,12 +741,23 @@
+ 
+ 		bool found = false;
+ 
++#ifdef PLURIBUS
++		int key = hash_key(iface);
++		struct intname_defn *in;
++		for (in = allowup->intname_hash[key]; in != NULL; in = in->next) {
++			if (strcmp(in->name, iface) == 0) {
++				found = true;
++				break;
++			}
++		}
++#else
+ 		for (int i = 0; i < allowup->n_interfaces; i++) {
+ 			if (strcmp(allowup->interfaces[i], iface) == 0) {
+ 				found = true;
+ 				break;
+ 			}
+ 		}
++#endif
+ 
+ 		if (!found)
+ 			return true;
+@@ -794,7 +805,13 @@
+ 
+ 	bool found = false;
+ 
+-	for (interface_defn *currif = defn->ifaces; currif; currif = currif->next) {
++#ifdef PLURIBUS
++	int key = hash_key(liface);
++	interface_defn *currif = defn->ifaces[key];
++#else
++	interface_defn *currif = defn->ifaces;
++#endif
++	for (; currif; currif = currif->next) {
+ 		if (strcmp(liface, currif->logical_iface) == 0) {
+ 			found = true;
+ 			break;
+@@ -853,7 +870,9 @@
+ 			return false;
+ 		}
+ 
+-		plock = lock_interface(piface, NULL);
++		if (cmds != iface_list) {
++			plock = lock_interface(piface, NULL);
++		}
+ 	}
+ 
+ 	/* Start by locking this interface */
+@@ -862,7 +881,9 @@
+ 	FILE *lock = NULL;
+ 	char *current_state = NULL;
+ 
+-	lock = lock_interface(iface, &current_state);
++	if (cmds != iface_list) {
++		lock = lock_interface(iface, &current_state);
++	}
+ 
+ 	/* If we are not forcing the command, then exit with success if it is a no-op */
+ 
+@@ -942,7 +963,13 @@
+ 	/* Handle ifquery --list */
+ 
+ 	if (cmds == iface_list) {
+-		for (interface_defn *currif = defn->ifaces; currif; currif = currif->next)
++#ifdef PLURIBUS	
++		key = hash_key(liface);
++		interface_defn *currif = defn->ifaces[key];
++#else
++		interface_defn *currif = defn->ifaces;
++#endif
++		for (; currif; currif = currif->next)
+ 			if (strcmp(liface, currif->logical_iface) == 0)
+ 				okay = true;
+ 
+@@ -961,7 +988,19 @@
+ 		}
+ 
+ 		if (okay) {
+-			interface_defn *currif = defn->ifaces;
++#ifdef PLURIBUS
++			int i;
++			interface_defn *currif = NULL;
++
++			for (i = 0; i < HASH_TABLE_SIZE; i++) {
++				if (defn->ifaces[i] != NULL) {
++					currif = defn->ifaces[i];
++					break;
++				}
++			}
++#else
++			interface_defn *currif = defn->ifaces_real;
++#endif
+ 			currif->real_iface = iface;
+ 			cmds(currif);
+ 			currif->real_iface = NULL;
+@@ -972,8 +1011,13 @@
+ 	}
+ 
+ 	/* Run the desired command for all matching logical interfaces */
+-
+-	for (interface_defn *currif = defn->ifaces; currif; currif = currif->next) {
++#ifdef PLURIBUS
++	key = hash_key(liface);
++	currif = defn->ifaces[key];
++#else
++	currif = defn->ifaces;
++#endif
++	for (; currif; currif = currif->next) {
+ 		if (strcmp(liface, currif->logical_iface) == 0) {
+ 			/* Bring the link up if necessary, but only once for each physical interface */
+ 			if (!okay && (cmds == iface_up)) {
+Only in nv-ifupdown/: tags

@@ -1,0 +1,11 @@
+--- openssh-8.2p1-4ubuntu0.3/debian/rules	2021-11-29 01:58:43.783571865 -0800
++++ openssh-8.2p1-4ubuntu0.3-new/debian/rules	2021-11-29 01:57:38.351567237 -0800
+@@ -217,7 +217,7 @@
+ 
+ # Tighten libssl dependencies to match the check in entropy.c.
+ override_dh_shlibdeps:
+-	dh_shlibdeps
++	dh_shlibdeps -- --ignore-missing-info
+ 	debian/adjust-openssl-dependencies
+ 
+ override_dh_gencontrol:

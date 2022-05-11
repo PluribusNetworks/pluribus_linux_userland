@@ -1,0 +1,99 @@
+diff --git a/Makefile b/Makefile
+index e26722a..bd648b2 100644
+--- a/Makefile
++++ b/Makefile
+@@ -8,12 +8,15 @@ else
+ CFLAGS = -fPIC -std=c99 -O3  -Wall -Wextra -Wshadow
+ endif # debug
+ OBJECTS=bitset.o
+-all: unit benchmark lemirebenchmark $(OBJECTS)
++all: unit benchmark lemirebenchmark $(OBJECTS) library
+ HEADERS=./include/bitset.h ./include/portability.h
+ 
+ bitset.o: ./src/bitset.c $(HEADERS)
+ 	$(CC) $(CFLAGS) -c ./src/bitset.c -Iinclude
+ 
++library:
++	$(CC) -shared -o libbitset.so ./bitset.o  -Wl,-R/lib64,--enable-new-dtags
++
+ unit: bitset.o ./tests/unit.c $(HEADERS)
+ 	$(CC) $(CFLAGS) -o unit ./tests/unit.c bitset.o -Iinclude
+ 
+diff --git a/benchmarks/lemirebenchmark.c b/benchmarks/lemirebenchmark.c
+index b09602b..5b46286 100644
+--- a/benchmarks/lemirebenchmark.c
++++ b/benchmarks/lemirebenchmark.c
+@@ -71,7 +71,7 @@ size_t iterateb(bitset_t *b1) {
+   return sum;
+ }
+ 
+-bool incr(size_t value, void *param) {
++bool incr(__attribute__((unused))size_t value , void *param) {
+   size_t sum;
+   memcpy(&sum, param, sizeof(size_t));
+   sum++;
+diff --git a/include/bitset.h b/include/bitset.h
+index 767ad96..90082de 100644
+--- a/include/bitset.h
++++ b/include/bitset.h
+@@ -125,6 +125,8 @@ size_t bitset_minimum(const bitset_t *bitset);
+ /* Find the index of the last bit set.  */
+ size_t bitset_maximum(const bitset_t *bitset);
+ 
++/* Find the index of First Zero in least significant bit. */
++size_t bitset_get_least_zero(const bitset_t *bitset);
+ 
+ /* compute the union in-place (to b1), returns true if successful, to generate a new bitset first call bitset_copy */
+ bool bitset_inplace_union(bitset_t * CBITSET_RESTRICT b1, const bitset_t * CBITSET_RESTRICT b2);
+diff --git a/src/bitset.c b/src/bitset.c
+index 2c4a75d..c785b26 100644
+--- a/src/bitset.c
++++ b/src/bitset.c
+@@ -188,6 +188,17 @@ size_t bitset_maximum(const bitset_t *bitset) {
+   return 0;
+ }
+ 
++size_t bitset_get_least_zero(const bitset_t *bitset) {
++   for(size_t k = 0; k < bitset->arraysize ; k++) {
++       uint64_t w = bitset->array[k];
++       if (__builtin_popcountll(w) != 64) {
++	   return 64*k + __builtin_ffsll(~w)-1;
++       }
++   }
++
++   return 0;
++}
++
+ /* Returns true if bitsets share no common elements, false otherwise.
+  *
+  * Performs early-out if common element found. */
+diff --git a/tests/unit.c b/tests/unit.c
+index 744b9a5..732ca71 100644
+--- a/tests/unit.c
++++ b/tests/unit.c
+@@ -249,6 +249,18 @@ void test_contains_all() {
+   bitset_free(subset);
+ }
+ 
++void test_get_firzero() {
++	bitset_t *t = bitset_create();
++	for (int i = 0; i <= 999; i++) {
++	    bitset_set(t, i);
++	}
++/*
++	printf("bit:%lx\n", t->array[0]);
++	printf("ffs:%d\n", __builtin_ffsll(~(t->array[0]))-1);
++	printf("%ld", bitset_get_least_zero(t));
++*/
++	assert(bitset_get_least_zero(t) == 1000);
++}
+ 
+ int main() {
+   test_set_to_val();
+@@ -264,5 +276,6 @@ int main() {
+   test_intersects();
+   test_contains_all();
+   test_contains_all_different_sizes();
++  test_get_firzero() ;
+   printf("All asserts passed. Code is probably ok.\n");
+ }
