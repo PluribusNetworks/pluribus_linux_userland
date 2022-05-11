@@ -1,0 +1,13 @@
+diff -ur linux-5.4.0/debian/rules linux-5.4.0.new/debian/rules
+--- linux-5.4.0/debian/rules	2021-06-17 06:37:12.000000000 -0700
++++ linux-5.4.0.new/debian/rules	2021-06-17 07:06:03.399963618 -0700
+@@ -52,7 +52,8 @@
+ endif
+ 
+ # Are any of the kernel signing options enabled.
+-any_signed=$(sort $(filter-out false,$(uefi_signed) $(opal_signed) $(sipl_signed)))
++#any_signed=$(sort $(filter-out false,$(uefi_signed) $(opal_signed) $(sipl_signed)))
++any_signed=false
+ ifeq ($(any_signed),true)
+ bin_pkg_name=$(bin_pkg_name_unsigned)
+ else

@@ -1,0 +1,12 @@
+diff -u -r linux-5.4.0/fs/btrfs/volumes.c linux-5.4.0.new/fs/btrfs/volumes.c
+--- linux-5.4.0/fs/btrfs/volumes.c	2021-06-17 21:00:51.000000000 -0700
++++ linux-5.4.0.new/fs/btrfs/volumes.c	2021-06-23 20:43:37.242640360 -0700
+@@ -7664,8 +7664,6 @@
+ 			else
+ 				btrfs_dev_stat_set(dev, i, 0);
+ 		}
+-		btrfs_info(fs_info, "device stats zeroed by %s (%d)",
+-			   current->comm, task_pid_nr(current));
+ 	} else {
+ 		for (i = 0; i < BTRFS_DEV_STAT_VALUES_MAX; i++)
+ 			if (stats->nr_items > i)

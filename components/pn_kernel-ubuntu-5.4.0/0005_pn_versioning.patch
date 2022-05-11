@@ -1,0 +1,12 @@
+diff -u -r linux-5.4.0/debian/rules.d/0-common-vars.mk linux-5.4.0.new/debian/rules.d/0-common-vars.mk
+--- linux-5.4.0/debian/rules.d/0-common-vars.mk	2021-06-30 03:31:24.000000000 -0700
++++ linux-5.4.0.new/debian/rules.d/0-common-vars.mk	2021-06-30 06:29:20.716407944 -0700
+@@ -79,7 +79,7 @@
+ skipdbg=true
+ endif
+ 
+-abinum		:= $(shell echo $(revision) | sed -r -e 's/([^\+~]*)\.[^\.]+(~.*)?(\+.*)?$$/\1/')$(abi_suffix)
++abinum		:= $(shell echo $(revision) | sed -r -e 's/([^\+~]*)\.([^\+~]*)\.[^\.]+(~.*)?(\+.*)?$$/\1/')$(abi_suffix)
+ prev_abinum	:= $(shell echo $(prev_revision) | sed -r -e 's/([^\+~]*)\.[^\.]+(~.*)?(\+.*)?$$/\1/')$(abi_suffix)
+ abi_release	:= $(release)-$(abinum)
+ 
