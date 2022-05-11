@@ -1,0 +1,12 @@
+[Unit]
+Description=WPA supplicant daemon (interface- and wired driver-specific version)
+
+[Service]
+Type=forking
+ExecStart=/usr/bin/svc-wpa_supplicant start
+ExecStop=/usr/bin/svc-wpa_supplicant stop
+TimeoutStartSec=1200
+Restart=on-failure
+RestartSec=10
+[Install]
+Alias=multi-user.target.wants/wpa_supplicant-wired.service

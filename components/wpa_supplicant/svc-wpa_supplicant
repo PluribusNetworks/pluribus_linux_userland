@@ -1,0 +1,58 @@
+#!/bin/bash
+
+USAGE="Usage: $0 { start | stop | status}"
+
+setup_trap() {
+          trap finish EXIT
+}
+
+do_start() {
+	ARGS=`/usr/local/bin/ovs-vsctl list-ifaces nvmgmt0 | grep -v vmgmt0`
+	/usr/bin/wpa_supplicant -c/etc/wpa_supplicant.conf -Dwired -i$ARGS &
+	/usr/sbin/ifplugd -i $ARGS
+}
+
+do_stop() {
+	/usr/bin/pkill -o -x wpa_supplicant
+	/usr/bin/pkill -o -x ifplugd
+	system_status=$(/bin/systemctl is-system-running)
+	if [[ "$system_status" == "running" ]]; then
+		rm -f /etc/wpa_supplicant.conf
+	fi
+}
+
+do_status() {
+        pid=$( pgrep -x wpa_supplicant )
+        rc=$?
+        if [ $rc != 0 ]; then
+                echo "offline"
+        else
+                echo "online"
+        fi
+}
+
+case "$1" in
+'start')
+	setup_trap
+	do_start
+	;;
+'stop')
+	setup_trap
+	do_stop
+	;;
+'restart'|'force-reload')
+	setup_trap
+	do_stop
+	sleep 1
+	do_start
+	;;
+'status')
+	do_status
+	;;
+*)
+	echo $USAGE
+	exit 1
+	;;
+esac
+
+exit 0
