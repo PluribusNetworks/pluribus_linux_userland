@@ -1,0 +1,23 @@
+diff -ru linux-5.4.0/drivers/char/ipmi/ipmi_si_intf.c linux-5.4.0-new/drivers/char/ipmi/ipmi_si_intf.c
+--- linux-5.4.0/drivers/char/ipmi/ipmi_si_intf.c	2022-01-02 17:10:41.000000000 -0800
++++ linux-5.4.0-new/drivers/char/ipmi/ipmi_si_intf.c	2022-01-02 17:26:29.238705028 -0800
+@@ -1020,10 +1020,18 @@
+ 			 * complete as fast as possible, but normally
+ 			 * don't bang on the scheduler.
+ 			 */
++#ifdef NO_PN_MOD
+ 			if (smi_info->in_maintenance_mode)
+ 				schedule();
+ 			else
+ 				usleep_range(100, 200);
++#else
++			/*
++			 * We still need to run as fast as possible to
++			 * get sensor data in time.
++			 */
++			schedule();
++#endif
+ 		} else if (smi_result == SI_SM_IDLE) {
+ 			if (atomic_read(&smi_info->need_watch)) {
+ 				schedule_timeout_interruptible(100);
+Only in linux-5.4.0-new/drivers/char/ipmi: tags

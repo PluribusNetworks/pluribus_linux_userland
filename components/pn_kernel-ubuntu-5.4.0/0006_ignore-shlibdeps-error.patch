@@ -1,0 +1,12 @@
+diff -ur linux-5.4.0/debian/rules.d/2-binary-arch.mk linux-5.4.0.new/debian/rules.d/2-binary-arch.mk
+--- linux-5.4.0/debian/rules.d/2-binary-arch.mk	2021-09-09 04:28:16.286830539 -0700
++++ linux-5.4.0.new/debian/rules.d/2-binary-arch.mk	2021-09-09 04:27:05.528825534 -0700
+@@ -15,7 +15,7 @@
+ kmake += CC=$(CROSS_COMPILE)$(gcc)
+ endif
+ 
+-shlibdeps_opts = $(if $(CROSS_COMPILE),-- -l$(CROSS_COMPILE:%-=/usr/%)/lib)
++shlibdeps_opts = $(if $(CROSS_COMPILE),-- -l$(CROSS_COMPILE:%-=/usr/%)/lib) --dpkg-shlibdeps-params=--ignore-missing-info
+ 
+ debian/scripts/fix-filenames: debian/scripts/fix-filenames.c
+ 	$(CC) -o $@ $^

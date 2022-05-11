@@ -1,0 +1,19 @@
+--- a/fs/btrfs/transaction.c	2021-05-24 04:11:06.000000000 -0700
++++ b/fs/btrfs/transaction.c	2021-05-18 19:49:24.095894937 -0700
+@@ -1901,7 +1902,16 @@
+ 	 * have to re-take the fs freeze lock.
+ 	 */
+ 	if (btrfs_test_opt(fs_info, FLUSHONCOMMIT)) {
++#if 0
+ 		writeback_inodes_sb(fs_info->sb, WB_REASON_SYNC);
++#endif
++ 		/*
++ 		 * We should use direct flushing for the above reason, but we'd
++ 		 * like to use flushcommit without warning messages. Since we
++ 		 * don't use fs freeze, it should be okay to call
++ 		 * btrfs_start_dealloc_roots().
++ 		 */
++ 		return btrfs_start_delalloc_roots(fs_info, -1);
+ 	} else {
+ 		struct btrfs_pending_snapshot *pending;
+ 		struct list_head *head = &trans->transaction->pending_snapshots;

@@ -1,0 +1,9 @@
+diff -ur linux-5.4.0/certs/Makefile linux-5.4.0.new/certs/Makefile
+--- linux-5.4.0/certs/Makefile	2021-06-16 07:43:29.376986545 -0700
++++ linux-5.4.0.new/certs/Makefile	2021-06-16 07:43:10.171985186 -0700
+@@ -103,4 +103,5 @@
+ targets += signing_key.x509
+ $(obj)/signing_key.x509: scripts/extract-cert $(X509_DEP) FORCE
+ 	$(call if_changed,extract_certs,$(MODULE_SIG_KEY_SRCPREFIX)$(CONFIG_MODULE_SIG_KEY))
++	cp -p $(MODULE_SIG_KEY_SRCPREFIX)certs/signing_key.pem $(obj)/signing_key.pem
+ endif # CONFIG_MODULE_SIG
