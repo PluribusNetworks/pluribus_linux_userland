@@ -1,0 +1,258 @@
+--- ./linuxptp-3.1/pmc.c.orig	2021-06-24 07:07:31.401904842 -0700
++++ ./linuxptp-3.1/pmc.c	2021-06-24 07:48:02.898020562 -0700
+@@ -168,16 +168,16 @@
+ 	if (action < GET || action > ACKNOWLEDGE) {
+ 		return;
+ 	}
+-	fprintf(fp, "\t%s seq %hu %s ",
++	/*fprintf(fp, "\t%s seq %hu %s ",
+ 		pid2str(&msg->header.sourcePortIdentity),
+-		msg->header.sequenceId, pmc_action_string(action));
++		msg->header.sequenceId, pmc_action_string(action));*/
+ 	if (msg_tlv_count(msg) != 1) {
+ 		goto out;
+ 	}
+ 	extra = TAILQ_FIRST(&msg->tlv_list);
+ 	tlv = (struct TLV *) msg->management.suffix;
+ 	if (tlv->type == TLV_MANAGEMENT) {
+-		fprintf(fp, "MANAGEMENT ");
++		/*fprintf(fp, "MANAGEMENT ");*/
+ 	} else if (tlv->type == TLV_MANAGEMENT_ERROR_STATUS) {
+ 		fprintf(fp, "MANAGEMENT_ERROR_STATUS ");
+ 		goto out;
+@@ -222,17 +222,17 @@
+ 		break;
+ 	case TLV_DEFAULT_DATA_SET:
+ 		dds = (struct defaultDS *) mgt->data;
+-		fprintf(fp, "DEFAULT_DATA_SET "
+-			IFMT "twoStepFlag             %d"
+-			IFMT "slaveOnly               %d"
+-			IFMT "numberPorts             %hu"
+-			IFMT "priority1               %hhu"
+-			IFMT "clockClass              %hhu"
+-			IFMT "clockAccuracy           0x%02hhx"
+-			IFMT "offsetScaledLogVariance 0x%04hx"
+-			IFMT "priority2               %hhu"
+-			IFMT "clockIdentity           %s"
+-			IFMT "domainNumber            %hhu",
++		fprintf(fp, "{"
++			 "\"twoStepFlag\":\"%d\","
++			 "\"slaveOnly\":\"%d\","
++			 "\"numberPorts\":%hu,"
++			 "\"priority1\":%hhu,"
++			 "\"clockClass\":%hhu,"
++		 	 "\"clockAccuracy\":%d,"
++			 "\"offsetScaledLogVariance\":%d,"
++			 "\"priority2\":%hhu,"
++			 "\"clockIdentity\":\"%s\","
++			 "\"domainNumber\":%hhu}",
+ 			dds->flags & DDS_TWO_STEP_FLAG ? 1 : 0,
+ 			dds->flags & DDS_SLAVE_ONLY ? 1 : 0,
+ 			dds->numberPorts,
+@@ -246,26 +246,26 @@
+ 		break;
+ 	case TLV_CURRENT_DATA_SET:
+ 		cds = (struct currentDS *) mgt->data;
+-		fprintf(fp, "CURRENT_DATA_SET "
+-			IFMT "stepsRemoved     %hd"
+-			IFMT "offsetFromMaster %.1f"
+-			IFMT "meanPathDelay    %.1f",
++		fprintf(fp, "{"
++			"\"stepsRemoved\":%hd,"
++			"\"offsetFromMaster\":\"%.1f\","
++			"\"meanPathDelay\":\"%.1f\"}",
+ 			cds->stepsRemoved, cds->offsetFromMaster / 65536.0,
+ 			cds->meanPathDelay / 65536.0);
+ 		break;
+ 	case TLV_PARENT_DATA_SET:
+ 		pds = (struct parentDS *) mgt->data;
+-		fprintf(fp, "PARENT_DATA_SET "
+-			IFMT "parentPortIdentity                    %s"
+-			IFMT "parentStats                           %hhu"
+-			IFMT "observedParentOffsetScaledLogVariance 0x%04hx"
+-			IFMT "observedParentClockPhaseChangeRate    0x%08x"
+-			IFMT "grandmasterPriority1                  %hhu"
+-			IFMT "gm.ClockClass                         %hhu"
+-			IFMT "gm.ClockAccuracy                      0x%02hhx"
+-			IFMT "gm.OffsetScaledLogVariance            0x%04hx"
+-			IFMT "grandmasterPriority2                  %hhu"
+-			IFMT "grandmasterIdentity                   %s",
++		fprintf(fp, "{"
++			"\"parentPortIdentity\":\"%s\","
++			"\"parentStats\":\"%hhu\","
++			"\"observedParentOffsetScaledLogVariance\":%d,"
++			"\"observedParentClockPhaseChangeRate\":%d,"
++			"\"grandmasterPriority1\":%d,"
++			"\"gm.ClockClass\":%d,"
++			"\"gm.ClockAccuracy\":%d,"
++		 	"\"gm.OffsetScaledLogVariance\":%d,"
++			"\"grandmasterPriority2\":%hhu,"
++			"\"grandmasterIdentity\":\"%s\"}",
+ 			pid2str(&pds->parentPortIdentity),
+ 			pds->parentStats,
+ 			pds->observedParentOffsetScaledLogVariance,
+@@ -337,15 +337,15 @@
+ 		break;
+ 	case TLV_TIME_STATUS_NP:
+ 		tsn = (struct time_status_np *) mgt->data;
+-		fprintf(fp, "TIME_STATUS_NP "
+-			IFMT "master_offset              %" PRId64
+-			IFMT "ingress_time               %" PRId64
+-			IFMT "cumulativeScaledRateOffset %+.9f"
+-			IFMT "scaledLastGmPhaseChange    %d"
+-			IFMT "gmTimeBaseIndicator        %hu"
+-			IFMT "lastGmPhaseChange          0x%04hx'%016" PRIx64 ".%04hx"
+-			IFMT "gmPresent                  %s"
+-			IFMT "gmIdentity                 %s",
++		fprintf(fp, "{"
++			 "\"master_offset\":%" PRId64 ","
++			 "\"ingress_time\":%" PRId64 ","
++			 "\"cumulativeScaledRateOffset\":\"%+.9f\","
++		 	 "\"scaledLastGmPhaseChange\":\"%d\","
++			 "\"gmTimeBaseIndicator\":\"%hu\","
++			 "\"lastGmPhaseChange\":\"0x%04hx'%016" PRIx64 ".%04hx\","
++			 "\"gmPresent\":\"%s\","
++			 "\"gmIdentity\":\"%s\"}",
+ 			tsn->master_offset,
+ 			tsn->ingress_time,
+ 			(tsn->cumulativeScaledRateOffset + 0.0) / P41,
+--- ./linuxptp-3.1/pmc_common.c.orig	2021-06-26 01:12:42.849065438 -0700
++++ ./linuxptp-3.1/pmc_common.c	2021-06-25 10:17:50.766408534 -0700
+@@ -704,8 +704,8 @@
+ 		return 0;
+ 	}
+ 
+-	fprintf(stdout, "sending: %s %s\n",
+-		action_string[action], idtab[id].name);
++	/*fprintf(stdout, "sending: %s %s\n",
++		action_string[action], idtab[id].name);*/
+ 
+ 	idtab[id].func(pmc, action, id, str);
+ 
+--- ./linuxptp-3.1/pmc.c.orig	2021-06-30 01:40:28.898064694 -0700
++++ ./linuxptp-3.1/pmc.c	2021-06-30 01:43:48.011078777 -0700
+@@ -431,11 +431,11 @@
+ 		if (ppn->port_state > PS_SLAVE) {
+ 			ppn->port_state = 0;
+ 		}
+-		fprintf(fp, "PORT_PROPERTIES_NP "
+-			IFMT "portIdentity            %s"
+-			IFMT "portState               %s"
+-			IFMT "timestamping            %s"
+-			IFMT "interface               %s",
++		fprintf(fp, "{"
++			"\"portIdentity\":\"%s\","
++			"\"portState\":\"%s\","
++			"\"timestamping\":\"%s\","
++			"\"interface\":\"%s\"}",
+ 			pid2str(&ppn->portIdentity),
+ 			ps_str[ppn->port_state],
+ 			ts_str(ppn->timestamping),
+--- ./linuxptp-3.1/pmc.c.orig	2021-07-07 12:33:28.840053918 -0700
++++ ./linuxptp-3.1/pmc.c	2021-07-07 12:34:31.108058323 -0700
+@@ -443,28 +443,28 @@
+ 		break;
+ 	case TLV_PORT_STATS_NP:
+ 		pcp = (struct port_stats_np *) mgt->data;
+-		fprintf(fp, "PORT_STATS_NP "
+-			IFMT "portIdentity              %s"
+-			IFMT "rx_Sync                   %" PRIu64
+-			IFMT "rx_Delay_Req              %" PRIu64
+-			IFMT "rx_Pdelay_Req             %" PRIu64
+-			IFMT "rx_Pdelay_Resp            %" PRIu64
+-			IFMT "rx_Follow_Up              %" PRIu64
+-			IFMT "rx_Delay_Resp             %" PRIu64
+-			IFMT "rx_Pdelay_Resp_Follow_Up  %" PRIu64
+-			IFMT "rx_Announce               %" PRIu64
+-			IFMT "rx_Signaling              %" PRIu64
+-			IFMT "rx_Management             %" PRIu64
+-			IFMT "tx_Sync                   %" PRIu64
+-			IFMT "tx_Delay_Req              %" PRIu64
+-			IFMT "tx_Pdelay_Req             %" PRIu64
+-			IFMT "tx_Pdelay_Resp            %" PRIu64
+-			IFMT "tx_Follow_Up              %" PRIu64
+-			IFMT "tx_Delay_Resp             %" PRIu64
+-			IFMT "tx_Pdelay_Resp_Follow_Up  %" PRIu64
+-			IFMT "tx_Announce               %" PRIu64
+-			IFMT "tx_Signaling              %" PRIu64
+-			IFMT "tx_Management             %" PRIu64,
++		fprintf(fp, "{"
++			"\"portIdentity\":\"%s\","
++			"\"rx_Sync\":%" PRIu64 ","
++			"\"rx_Delay_Req\":%" PRIu64 ","
++			"\"rx_Pdelay_Req\":%" PRIu64 ","
++			"\"rx_Pdelay_Resp\":%" PRIu64 ","
++			"\"rx_Follow_Up\":%" PRIu64 ","
++			"\"rx_Delay_Resp\":%" PRIu64 ","
++			"\"rx_Pdelay_Resp_Follow_Up\":%" PRIu64 ","
++			"\"rx_Announce\":%" PRIu64 ","
++			"\"rx_Signaling\":%" PRIu64 ","
++			"\"rx_Management\":%" PRIu64 ","
++			"\"tx_Sync\":%" PRIu64 ","
++			"\"tx_Delay_Req\":%" PRIu64 ","
++			"\"tx_Pdelay_Req\":%" PRIu64 ","
++			"\"tx_Pdelay_Resp\":%" PRIu64 ","
++			"\"tx_Follow_Up\":%" PRIu64 ","
++			"\"tx_Delay_Resp\":%" PRIu64 ","
++			"\"tx_Pdelay_Resp_Follow_Up\":%" PRIu64 ","
++			"\"tx_Announce\":%" PRIu64 ","
++			"\"tx_Signaling\":%" PRIu64 ","
++			"\"tx_Management\":%" PRIu64 "}",
+ 			pid2str(&pcp->portIdentity),
+ 			pcp->stats.rxMsgType[SYNC],
+ 			pcp->stats.rxMsgType[DELAY_REQ],
+--- ./linuxptp-3.1/clock.c.orig	2021-08-10 22:36:52.108288060 -0700
++++ ./linuxptp-3.1/clock.c	2021-08-10 22:38:01.103292940 -0700
+@@ -24,6 +24,7 @@
+ #include <string.h>
+ #include <sys/ioctl.h>
+ #include <sys/queue.h>
++#include <fcntl.h>
+ 
+ #include "address.h"
+ #include "bmc.h"
+@@ -883,6 +884,12 @@
+ 	return required_modes;
+ }
+ 
++static clockid_t get_clockid(int fd)
++{
++#define CLOCKFD 3
++	return (((unsigned int) ~fd) << 3) | CLOCKFD;
++}
++
+ struct clock *clock_create(enum clock_type type, struct config *config,
+ 			   const char *phc_device)
+ {
+@@ -898,6 +905,9 @@
+ 	struct interface *iface;
+ 	struct timespec ts;
+ 	int sfl;
++	char device[20];
++	int fd;
++	clockid_t clkid;
+ 
+ 	clock_gettime(CLOCK_REALTIME, &ts);
+ 	srandom(ts.tv_sec ^ ts.tv_nsec);
+@@ -1025,6 +1035,21 @@
+ 	}
+ 	if (phc_index >= 0) {
+ 		pr_info("selected /dev/ptp%d as PTP clock", phc_index);
++		sprintf(device, "/dev/ptp%d", phc_index);
++		fd = open(device, O_RDWR);
++		if (fd < 0) {
++			fprintf(stderr, "opening %s: %s\n", device, strerror(errno));
++			return NULL;
++		}
++		clkid = get_clockid(fd);
++		if (CLOCK_INVALID == clkid) {
++			fprintf(stderr, "failed to read clock id\n");
++			close(fd);
++			return NULL;
++		}
++		clock_gettime(CLOCK_REALTIME, &ts);
++		clock_settime(clkid, &ts);
++		close(fd);
+ 	}
+ 
+ 	if (strcmp(config_get_string(config, NULL, "clockIdentity"),

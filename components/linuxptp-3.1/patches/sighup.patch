@@ -1,0 +1,95 @@
+--- ./linuxptp-3.1/ptp4l.c	2021-09-08 05:22:54.109940937 -0700
++++ ./linuxptp-3.1/ptp4l.c	2021-09-08 05:22:47.894009790 -0700
+@@ -22,6 +22,7 @@
+ #include <stdlib.h>
+ #include <string.h>
+ #include <unistd.h>
++#include <signal.h>
+ 
+ #include "clock.h"
+ #include "config.h"
+@@ -68,6 +69,62 @@
+ 		progname);
+ }
+ 
++static int reconfig = 0;
++#define PTP4L_CONF "/etc/ptp4l.conf"
++
++static int load_log_level(char *config)
++{
++	int log_level = -1;
++	FILE *fp;
++	char buf[64];
++	char *tok;
++	
++	fp = fopen(config, "r");
++	if (!fp) {
++		pr_notice("PN: failed to open config file");
++		return log_level;
++	}
++
++	while ((fgets(buf, sizeof (buf), fp)) != NULL) {
++		if (strstr(buf, "logging_level") != NULL) {
++			tok = strtok(buf, " ");
++			tok = strtok(NULL, " ");
++			log_level = atoi(tok);
++			break;
++		}
++	}
++	fclose(fp);
++	return log_level;
++}
++
++void log_reconfig(void)
++{
++	int log_level = 0;
++	pr_notice("PN: received SIGHUP");
++	log_level = load_log_level(PTP4L_CONF);
++	if (log_level >= PRINT_LEVEL_MIN &&
++	    log_level <= PRINT_LEVEL_MAX) {
++		pr_notice("PN: setting log_level to %d", log_level);
++		print_set_level(log_level);
++	} else {
++		pr_notice("PN: invalid log_level");
++	}
++}
++
++static void ptp4l_reconfig(int s)
++{
++	reconfig = 1;
++}
++
++int handle_sighup(void)
++{
++	if (SIG_ERR == signal(SIGHUP, ptp4l_reconfig)) {
++		fprintf(stderr, "cannot handle SIGHUP\n");
++		return -1;
++	}
++	return 0;
++}
++
+ int main(int argc, char *argv[])
+ {
+ 	char *config = NULL, *req_phc = NULL, *progname;
+@@ -80,6 +137,9 @@
+ 	if (handle_term_signals())
+ 		return -1;
+ 
++	if (handle_sighup())
++		return -1;
++
+ 	cfg = config_create();
+ 	if (!cfg) {
+ 		return -1;
+@@ -251,6 +311,11 @@
+ 	while (is_running()) {
+ 		if (clock_poll(clock))
+ 			break;
++		if (reconfig == 1) {
++			reconfig = 0;
++			log_reconfig();
++			pr_notice("PN: ptp4l reconfig");
++		}
+ 	}
+ out:
+ 	if (clock)
