@@ -1,0 +1,11 @@
+--- ./net-snmp-5.8/agent/mibgroup/notification-log-mib/notification_log.c.orig	Wed Aug  9 06:40:39 2017
++++ ./net-snmp-5.8/agent/mibgroup/notification-log-mib/notification_log.c	Wed Aug  9 06:40:54 2017
+@@ -59,7 +59,7 @@
+ static u_long   num_received = 0;
+ static u_long   num_deleted = 0;
+ 
+-static u_long   max_logged = 1000;      /* goes against the mib default of infinite */
++static u_long   max_logged = 50;      /* goes against the mib default of infinite */
+ static u_long   max_age = 1440; /* 1440 = 24 hours, which is the mib default */
+ 
+ static netsnmp_table_data_set *nlmLogTable;

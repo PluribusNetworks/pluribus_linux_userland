@@ -1,0 +1,2669 @@
+diff -uNr openvswitch-2.15.0/Makefile.am openvswitch-2.15.0-new/Makefile.am
+--- openvswitch-2.15.0/Makefile.am	2021-02-15 10:24:17.725074628 -0800
++++ openvswitch-2.15.0-new/Makefile.am	2021-05-11 06:51:08.840917970 -0700
+@@ -23,6 +23,9 @@
+ PLATFORM = $(MSVC_PLATFORM)
+ endif
+ 
++# For nvOS
++AM_LDFLAGS += -lnvOS -lnvutil -lpcap -lm -lnvssl -lnvedit
++
+ AM_CPPFLAGS += -I $(top_srcdir)/include
+ AM_CPPFLAGS += -I $(top_builddir)/include
+ AM_CPPFLAGS += -I $(top_srcdir)/lib
+diff -uNr openvswitch-2.15.0/Makefile.in openvswitch-2.15.0-new/Makefile.in
+--- openvswitch-2.15.0/Makefile.in	2021-02-15 10:24:26.854074628 -0800
++++ openvswitch-2.15.0-new/Makefile.in	2021-05-12 01:18:13.676101179 -0700
+@@ -445,6 +445,7 @@
+ 	lib/mcast-snooping.c lib/mcast-snooping.h lib/memory.c \
+ 	lib/memory.h lib/meta-flow.c lib/multipath.c lib/multipath.h \
+ 	lib/namemap.c lib/netdev-dpdk.h lib/netdev-dummy.c \
++	lib/netdev-nvos.c \
+ 	lib/netdev-offload.c lib/netdev-offload.h \
+ 	lib/netdev-offload-provider.h lib/netdev-provider.h \
+ 	lib/netdev-vport.c lib/netdev-vport.h \
+@@ -468,6 +469,7 @@
+ 	lib/ovs-atomic-msvc.h lib/ovs-atomic-pthreads.h \
+ 	lib/ovs-atomic-x86_64.h lib/ovs-atomic.h lib/ovs-lldp.c \
+ 	lib/ovs-lldp.h lib/ovs-numa.c lib/ovs-numa.h lib/ovs-rcu.c \
++	lib/ovs_nvos.c lib/ovs_nvos.h \
+ 	lib/ovs-rcu.h lib/ovs-router.h lib/ovs-router.c \
+ 	lib/ovs-thread.c lib/ovs-thread.h lib/ovsdb-cs.c \
+ 	lib/ovsdb-cs.h lib/ovsdb-data.c lib/ovsdb-data.h \
+@@ -579,7 +581,8 @@
+ 	lib/learn.lo lib/learning-switch.lo lib/lockfile.lo \
+ 	lib/mac-learning.lo lib/match.lo lib/mcast-snooping.lo \
+ 	lib/memory.lo lib/meta-flow.lo lib/multipath.lo lib/namemap.lo \
+-	lib/netdev-dummy.lo lib/netdev-offload.lo lib/netdev-vport.lo \
++	lib/netdev-dummy.lo lib/netdev-nvos.lo \
++	lib/netdev-offload.lo lib/netdev-vport.lo \
+ 	lib/netdev.lo lib/netlink.lo lib/nx-match.lo \
+ 	lib/object-collection.lo lib/odp-execute.lo lib/odp-util.lo \
+ 	lib/ofp-actions.lo lib/ofp-bundle.lo lib/ofp-connection.lo \
+@@ -591,6 +594,7 @@
+ 	lib/ofp-queue.lo lib/ofp-switch.lo lib/ofp-table.lo \
+ 	lib/ofp-util.lo lib/ofp-version-opt.lo lib/ofpbuf.lo \
+ 	lib/ovs-atomic-locked.lo lib/ovs-lldp.lo lib/ovs-numa.lo \
++	lib/ovs_nvos.lo \
+ 	lib/ovs-rcu.lo lib/ovs-router.lo lib/ovs-thread.lo \
+ 	lib/ovsdb-cs.lo lib/ovsdb-data.lo lib/ovsdb-error.lo \
+ 	lib/ovsdb-idl.lo lib/ovsdb-map-op.lo lib/ovsdb-set-op.lo \
+@@ -665,6 +669,7 @@
+ 	ofproto/libofproto_la-ofproto-dpif-trace.lo \
+ 	ofproto/libofproto_la-ofproto-dpif-upcall.lo \
+ 	ofproto/libofproto_la-ofproto-dpif-xlate.lo \
++	ofproto/libofproto_la-ofproto-nvos.lo \
+ 	ofproto/libofproto_la-ofproto-dpif-xlate-cache.lo \
+ 	ofproto/libofproto_la-pinsched.lo \
+ 	ofproto/libofproto_la-tunnel.lo \
+@@ -944,6 +949,7 @@
+ 	lib/$(DEPDIR)/netdev-offload-dpdk.Plo \
+ 	lib/$(DEPDIR)/netdev-offload-tc.Plo \
+ 	lib/$(DEPDIR)/netdev-offload.Plo \
++	lib/$(DEPDIR)/netdev-nvos.Plo \
+ 	lib/$(DEPDIR)/netdev-vport.Plo \
+ 	lib/$(DEPDIR)/netdev-windows.Plo lib/$(DEPDIR)/netdev.Plo \
+ 	lib/$(DEPDIR)/netlink-conntrack.Plo \
+@@ -965,6 +971,7 @@
+ 	lib/$(DEPDIR)/ofp-util.Plo lib/$(DEPDIR)/ofp-version-opt.Plo \
+ 	lib/$(DEPDIR)/ofpbuf.Plo lib/$(DEPDIR)/ovs-atomic-locked.Plo \
+ 	lib/$(DEPDIR)/ovs-lldp.Plo lib/$(DEPDIR)/ovs-numa.Plo \
++	lib/$(DEPDIR)/ovs_nvos.Plo \
+ 	lib/$(DEPDIR)/ovs-rcu.Plo lib/$(DEPDIR)/ovs-router.Plo \
+ 	lib/$(DEPDIR)/ovs-thread.Plo lib/$(DEPDIR)/ovsdb-condition.Plo \
+ 	lib/$(DEPDIR)/ovsdb-cs.Plo lib/$(DEPDIR)/ovsdb-data.Plo \
+@@ -1026,6 +1033,7 @@
+ 	ofproto/$(DEPDIR)/libofproto_la-ofproto-dpif-xlate-cache.Plo \
+ 	ofproto/$(DEPDIR)/libofproto_la-ofproto-dpif-xlate.Plo \
+ 	ofproto/$(DEPDIR)/libofproto_la-ofproto-dpif.Plo \
++	ofproto/$(DEPDIR)/libofproto_la-ofproto-nvos.Plo \
+ 	ofproto/$(DEPDIR)/libofproto_la-ofproto.Plo \
+ 	ofproto/$(DEPDIR)/libofproto_la-pinsched.Plo \
+ 	ofproto/$(DEPDIR)/libofproto_la-tunnel.Plo \
+@@ -1500,7 +1508,9 @@
+ AM_CPPFLAGS = $(SSL_CFLAGS) $(am__append_1) -I $(top_srcdir)/include \
+ 	-I $(top_builddir)/include -I $(top_srcdir)/lib -I \
+ 	$(top_builddir)/lib $(SSL_INCLUDES) $(am__append_4)
+-AM_LDFLAGS = $(SSL_LDFLAGS) $(OVS_LDFLAGS) $(am__append_2)
++# For nvOS
++AM_LDFLAGS = $(SSL_LDFLAGS) $(OVS_LDFLAGS) $(am__append_2) -lnvOS \
++	-lnvutil -lpcap -lm -lnvssl -lnvedit
+ @WIN32_TRUE@PLATFORM = $(MSVC_PLATFORM)
+ AM_CFLAGS = -Wstrict-prototypes $(WARNING_FLAGS) $(OVS_CFLAGS) \
+ 	$(am__append_3) $(am__append_5)
+@@ -2316,6 +2326,7 @@
+ 	lib/mcast-snooping.c lib/mcast-snooping.h lib/memory.c \
+ 	lib/memory.h lib/meta-flow.c lib/multipath.c lib/multipath.h \
+ 	lib/namemap.c lib/netdev-dpdk.h lib/netdev-dummy.c \
++	lib/netdev-nvos.c \
+ 	lib/netdev-offload.c lib/netdev-offload.h \
+ 	lib/netdev-offload-provider.h lib/netdev-provider.h \
+ 	lib/netdev-vport.c lib/netdev-vport.h \
+@@ -2339,6 +2350,7 @@
+ 	lib/ovs-atomic-msvc.h lib/ovs-atomic-pthreads.h \
+ 	lib/ovs-atomic-x86_64.h lib/ovs-atomic.h lib/ovs-lldp.c \
+ 	lib/ovs-lldp.h lib/ovs-numa.c lib/ovs-numa.h lib/ovs-rcu.c \
++	lib/ovs_nvos.c lib/ovs_nvos.h \
+ 	lib/ovs-rcu.h lib/ovs-router.h lib/ovs-router.c \
+ 	lib/ovs-thread.c lib/ovs-thread.h lib/ovsdb-cs.c \
+ 	lib/ovsdb-cs.h lib/ovsdb-data.c lib/ovsdb-data.h \
+@@ -2429,6 +2441,7 @@
+ 	ofproto/ofproto-dpif-trace.h ofproto/ofproto-dpif-upcall.c \
+ 	ofproto/ofproto-dpif-upcall.h ofproto/ofproto-dpif-xlate.c \
+ 	ofproto/ofproto-dpif-xlate.h ofproto/ofproto-provider.h \
++	ofproto/ofproto-nvos.c \
+ 	ofproto/ofproto-dpif-xlate-cache.c \
+ 	ofproto/ofproto-dpif-xlate-cache.h ofproto/pinsched.c \
+ 	ofproto/pinsched.h ofproto/tunnel.c ofproto/tunnel.h \
+@@ -3318,6 +3331,7 @@
+ lib/multipath.lo: lib/$(am__dirstamp) lib/$(DEPDIR)/$(am__dirstamp)
+ lib/namemap.lo: lib/$(am__dirstamp) lib/$(DEPDIR)/$(am__dirstamp)
+ lib/netdev-dummy.lo: lib/$(am__dirstamp) lib/$(DEPDIR)/$(am__dirstamp)
++lib/netdev-nvos.lo: lib/$(am__dirstamp) lib/$(DEPDIR)/$(am__dirstamp)
+ lib/netdev-offload.lo: lib/$(am__dirstamp) \
+ 	lib/$(DEPDIR)/$(am__dirstamp)
+ lib/netdev-vport.lo: lib/$(am__dirstamp) lib/$(DEPDIR)/$(am__dirstamp)
+@@ -3358,6 +3372,7 @@
+ 	lib/$(DEPDIR)/$(am__dirstamp)
+ lib/ovs-lldp.lo: lib/$(am__dirstamp) lib/$(DEPDIR)/$(am__dirstamp)
+ lib/ovs-numa.lo: lib/$(am__dirstamp) lib/$(DEPDIR)/$(am__dirstamp)
++lib/ovs_nvos.lo: lib/$(am__dirstamp) lib/$(DEPDIR)/$(am__dirstamp)
+ lib/ovs-rcu.lo: lib/$(am__dirstamp) lib/$(DEPDIR)/$(am__dirstamp)
+ lib/ovs-router.lo: lib/$(am__dirstamp) lib/$(DEPDIR)/$(am__dirstamp)
+ lib/ovs-thread.lo: lib/$(am__dirstamp) lib/$(DEPDIR)/$(am__dirstamp)
+@@ -3567,6 +3582,8 @@
+ 	ofproto/$(DEPDIR)/$(am__dirstamp)
+ ofproto/libofproto_la-ofproto-dpif-xlate-cache.lo:  \
+ 	ofproto/$(am__dirstamp) ofproto/$(DEPDIR)/$(am__dirstamp)
++ofproto/libofproto_la-ofproto-nvos.lo:  \
++	ofproto/$(am__dirstamp) ofproto/$(DEPDIR)/$(am__dirstamp)
+ ofproto/libofproto_la-pinsched.lo: ofproto/$(am__dirstamp) \
+ 	ofproto/$(DEPDIR)/$(am__dirstamp)
+ ofproto/libofproto_la-tunnel.lo: ofproto/$(am__dirstamp) \
+@@ -4257,6 +4274,7 @@
+ @AMDEP_TRUE@@am__include@ @am__quote@lib/$(DEPDIR)/netdev-offload-dpdk.Plo@am__quote@ # am--include-marker
+ @AMDEP_TRUE@@am__include@ @am__quote@lib/$(DEPDIR)/netdev-offload-tc.Plo@am__quote@ # am--include-marker
+ @AMDEP_TRUE@@am__include@ @am__quote@lib/$(DEPDIR)/netdev-offload.Plo@am__quote@ # am--include-marker
++@AMDEP_TRUE@@am__include@ @am__quote@lib/$(DEPDIR)/netdev-nvos.Plo@am__quote@ # am--include-marker
+ @AMDEP_TRUE@@am__include@ @am__quote@lib/$(DEPDIR)/netdev-vport.Plo@am__quote@ # am--include-marker
+ @AMDEP_TRUE@@am__include@ @am__quote@lib/$(DEPDIR)/netdev-windows.Plo@am__quote@ # am--include-marker
+ @AMDEP_TRUE@@am__include@ @am__quote@lib/$(DEPDIR)/netdev.Plo@am__quote@ # am--include-marker
+@@ -4295,6 +4313,7 @@
+ @AMDEP_TRUE@@am__include@ @am__quote@lib/$(DEPDIR)/ovs-atomic-locked.Plo@am__quote@ # am--include-marker
+ @AMDEP_TRUE@@am__include@ @am__quote@lib/$(DEPDIR)/ovs-lldp.Plo@am__quote@ # am--include-marker
+ @AMDEP_TRUE@@am__include@ @am__quote@lib/$(DEPDIR)/ovs-numa.Plo@am__quote@ # am--include-marker
++@AMDEP_TRUE@@am__include@ @am__quote@lib/$(DEPDIR)/ovs_nvos.Plo@am__quote@ # am--include-marker
+ @AMDEP_TRUE@@am__include@ @am__quote@lib/$(DEPDIR)/ovs-rcu.Plo@am__quote@ # am--include-marker
+ @AMDEP_TRUE@@am__include@ @am__quote@lib/$(DEPDIR)/ovs-router.Plo@am__quote@ # am--include-marker
+ @AMDEP_TRUE@@am__include@ @am__quote@lib/$(DEPDIR)/ovs-thread.Plo@am__quote@ # am--include-marker
+@@ -4392,6 +4411,7 @@
+ @AMDEP_TRUE@@am__include@ @am__quote@ofproto/$(DEPDIR)/libofproto_la-ofproto-dpif-upcall.Plo@am__quote@ # am--include-marker
+ @AMDEP_TRUE@@am__include@ @am__quote@ofproto/$(DEPDIR)/libofproto_la-ofproto-dpif-xlate-cache.Plo@am__quote@ # am--include-marker
+ @AMDEP_TRUE@@am__include@ @am__quote@ofproto/$(DEPDIR)/libofproto_la-ofproto-dpif-xlate.Plo@am__quote@ # am--include-marker
++@AMDEP_TRUE@@am__include@ @am__quote@ofproto/$(DEPDIR)/libofproto_la-ofproto-nvos.Plo@am__quote@ # am--include-marker
+ @AMDEP_TRUE@@am__include@ @am__quote@ofproto/$(DEPDIR)/libofproto_la-ofproto-dpif.Plo@am__quote@ # am--include-marker
+ @AMDEP_TRUE@@am__include@ @am__quote@ofproto/$(DEPDIR)/libofproto_la-ofproto.Plo@am__quote@ # am--include-marker
+ @AMDEP_TRUE@@am__include@ @am__quote@ofproto/$(DEPDIR)/libofproto_la-pinsched.Plo@am__quote@ # am--include-marker
+@@ -4615,6 +4635,13 @@
+ @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+ @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(ofproto_libofproto_la_CPPFLAGS) $(CPPFLAGS) $(ofproto_libofproto_la_CFLAGS) $(CFLAGS) -c -o ofproto/libofproto_la-ofproto-dpif.lo `test -f 'ofproto/ofproto-dpif.c' || echo '$(srcdir)/'`ofproto/ofproto-dpif.c
+ 
++ofproto/libofproto_la-ofproto-nvos.lo: ofproto/ofproto-nvos.c
++@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(ofproto_libofproto_la_CPPFLAGS) $(CPPFLAGS) $(ofproto_libofproto_la_CFLAGS) $(CFLAGS) -MT ofproto/libofproto_la-ofproto-nvos.lo -MD -MP -MF ofproto/$(DEPDIR)/libofproto_la-ofproto-nvos.Tpo -c -o ofproto/libofproto_la-ofproto-nvos.lo `test -f 'ofproto/ofproto-nvos.c' || echo '$(srcdir)/'`ofproto/ofproto-nvos.c
++@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ofproto/$(DEPDIR)/libofproto_la-ofproto-nvos.Tpo ofproto/$(DEPDIR)/libofproto_la-ofproto-nvos.Plo
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='ofproto/ofproto-nvos.c' object='ofproto/libofproto_la-ofproto-nvos.lo' libtool=yes @AMDEPBACKSLASH@
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
++@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(ofproto_libofproto_la_CPPFLAGS) $(CPPFLAGS) $(ofproto_libofproto_la_CFLAGS) $(CFLAGS) -c -o ofproto/libofproto_la-ofproto-nvos.lo `test -f 'ofproto/ofproto-nvos.c' || echo '$(srcdir)/'`ofproto/ofproto-nvos.c
++
+ ofproto/libofproto_la-ofproto-dpif-ipfix.lo: ofproto/ofproto-dpif-ipfix.c
+ @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(ofproto_libofproto_la_CPPFLAGS) $(CPPFLAGS) $(ofproto_libofproto_la_CFLAGS) $(CFLAGS) -MT ofproto/libofproto_la-ofproto-dpif-ipfix.lo -MD -MP -MF ofproto/$(DEPDIR)/libofproto_la-ofproto-dpif-ipfix.Tpo -c -o ofproto/libofproto_la-ofproto-dpif-ipfix.lo `test -f 'ofproto/ofproto-dpif-ipfix.c' || echo '$(srcdir)/'`ofproto/ofproto-dpif-ipfix.c
+ @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ofproto/$(DEPDIR)/libofproto_la-ofproto-dpif-ipfix.Tpo ofproto/$(DEPDIR)/libofproto_la-ofproto-dpif-ipfix.Plo
+diff -uNr openvswitch-2.15.0/datapath/Makefile.in openvswitch-2.15.0-new/datapath/Makefile.in
+--- openvswitch-2.15.0/datapath/Makefile.in	2021-02-15 10:24:26.881074628 -0800
++++ openvswitch-2.15.0-new/datapath/Makefile.in	2021-05-12 01:21:54.106846277 -0700
+@@ -360,6 +360,7 @@
+ prefix = @prefix@
+ program_transform_name = @program_transform_name@
+ psdir = @psdir@
++runstatedir = @runstatedir@
+ sbindir = @sbindir@
+ sharedstatedir = @sharedstatedir@
+ srcdir = @srcdir@
+@@ -380,21 +381,21 @@
+ # Some modules should be built but not distributed, e.g. third-party
+ # hwtable modules.
+ build_multi_modules = \
+-	openvswitch
++	pnopenvswitch
+ 
+ both_modules = \
+ 	$(build_multi_modules) \
+-	vport_geneve \
+-	vport_gre \
+-	vport_lisp \
+-	vport_stt \
+-	vport_vxlan
++	pnvport_geneve \
++	pnvport_gre \
++	pnvport_lisp \
++	pnvport_stt \
++	pnvport_vxlan
+ 
+ # When changing the name of 'build_modules', please also update the
+ # print-build-modules in Makefile.am.
+ build_modules = $(both_modules)	# Modules to build
+ dist_modules = $(both_modules)	# Modules to distribute
+-openvswitch_sources = actions.c conntrack.c datapath.c dp_notify.c \
++pnopenvswitch_sources = actions.c conntrack.c datapath.c dp_notify.c \
+ 	flow.c flow_netlink.c flow_table.c vport.c \
+ 	vport-internal_dev.c vport-netdev.c nsh.c meter.c \
+ 	linux/compat/dev-openvswitch.c linux/compat/dst_cache.c \
+@@ -416,13 +417,13 @@
+ 	linux/compat/stt.c linux/compat/udp.c \
+ 	linux/compat/udp_tunnel.c linux/compat/vxlan.c \
+ 	linux/compat/utils.c
+-vport_geneve_sources = vport-geneve.c
+-vport_vxlan_sources = vport-vxlan.c
+-vport_gre_sources = vport-gre.c
+-vport_lisp_sources = vport-lisp.c
+-vport_stt_sources = vport-stt.c
++pnvport_geneve_sources = vport-geneve.c
++pnvport_vxlan_sources = vport-vxlan.c
++pnvport_gre_sources = vport-gre.c
++pnvport_lisp_sources = vport-lisp.c
++pnvport_stt_sources = vport-stt.c
+ nsh_sources = nsh.c
+-openvswitch_headers = compat.h conntrack.h datapath.h flow.h \
++pnopenvswitch_headers = compat.h conntrack.h datapath.h flow.h \
+ 	flow_netlink.h flow_table.h vport.h vport-internal_dev.h \
+ 	vport-netdev.h meter.h linux/compat/gso.h \
+ 	linux/compat/include/linux/percpu.h \
+diff -uNr openvswitch-2.15.0/datapath/Modules.mk openvswitch-2.15.0-new/datapath/Modules.mk
+--- openvswitch-2.15.0/datapath/Modules.mk	2021-02-10 12:02:51.034074628 -0800
++++ openvswitch-2.15.0-new/datapath/Modules.mk	2021-05-12 01:21:47.123339283 -0700
+@@ -3,20 +3,20 @@
+ # Some modules should be built but not distributed, e.g. third-party
+ # hwtable modules.
+ build_multi_modules = \
+-	openvswitch
++	pnopenvswitch
+ both_modules = \
+ 	$(build_multi_modules) \
+-	vport_geneve \
+-	vport_gre \
+-	vport_lisp \
+-	vport_stt \
+-	vport_vxlan
++	pnvport_geneve \
++	pnvport_gre \
++	pnvport_lisp \
++	pnvport_stt \
++	pnvport_vxlan
+ # When changing the name of 'build_modules', please also update the
+ # print-build-modules in Makefile.am.
+ build_modules = $(both_modules)	# Modules to build
+ dist_modules = $(both_modules)	# Modules to distribute
+ 
+-openvswitch_sources = \
++pnopenvswitch_sources = \
+ 	actions.c \
+ 	conntrack.c \
+ 	datapath.c \
+@@ -30,14 +30,14 @@
+ 	nsh.c \
+ 	meter.c
+ 
+-vport_geneve_sources = vport-geneve.c
+-vport_vxlan_sources = vport-vxlan.c
+-vport_gre_sources = vport-gre.c
+-vport_lisp_sources = vport-lisp.c
+-vport_stt_sources = vport-stt.c
++pnvport_geneve_sources = vport-geneve.c
++pnvport_vxlan_sources = vport-vxlan.c
++pnvport_gre_sources = vport-gre.c
++pnvport_lisp_sources = vport-lisp.c
++pnvport_stt_sources = vport-stt.c
+ nsh_sources = nsh.c
+ 
+-openvswitch_headers = \
++pnopenvswitch_headers = \
+ 	compat.h \
+ 	conntrack.h \
+ 	datapath.h \
+diff -uNr openvswitch-2.15.0/datapath/actions.c openvswitch-2.15.0-new/datapath/actions.c
+--- openvswitch-2.15.0/datapath/actions.c	2021-02-10 12:04:59.483074628 -0800
++++ openvswitch-2.15.0-new/datapath/actions.c	2021-05-11 04:51:24.792217690 -0700
+@@ -283,6 +283,14 @@
+ static int pop_vlan(struct sk_buff *skb, struct sw_flow_key *key)
+ {
+ 	int err;
++#if defined(PLURIBUS)
++	struct vlan_ethhdr *vhdr;
++
++	vhdr = (struct vlan_ethhdr *)skb->data;
++	if (vhdr->h_vlan_proto == htons(ETH_P_8021Q)) {
++		skb->protocol = htons(ETH_P_8021Q);
++	}
++#endif
+ 
+ 	err = skb_vlan_pop(skb);
+ 	if (skb_vlan_tag_present(skb)) {
+diff -uNr openvswitch-2.15.0/datapath/linux/Modules.mk openvswitch-2.15.0-new/datapath/linux/Modules.mk
+--- openvswitch-2.15.0/datapath/linux/Modules.mk	2021-02-15 10:24:17.731074628 -0800
++++ openvswitch-2.15.0-new/datapath/linux/Modules.mk	2021-05-12 01:20:29.103363262 -0700
+@@ -1,4 +1,4 @@
+-openvswitch_sources += \
++pnopenvswitch_sources += \
+ 	linux/compat/dev-openvswitch.c \
+ 	linux/compat/dst_cache.c \
+ 	linux/compat/exthdrs_core.c \
+@@ -30,7 +30,7 @@
+ 	linux/compat/udp_tunnel.c \
+ 	linux/compat/vxlan.c	\
+ 	linux/compat/utils.c
+-openvswitch_headers += \
++pnopenvswitch_headers += \
+ 	linux/compat/gso.h \
+ 	linux/compat/include/linux/percpu.h \
+ 	linux/compat/include/linux/bug.h \
+diff -uNr openvswitch-2.15.0/lib/netdev-nvos.c openvswitch-2.15.0-new/lib/netdev-nvos.c
+--- openvswitch-2.15.0/lib/netdev-nvos.c	1969-12-31 16:00:00.000000000 -0800
++++ openvswitch-2.15.0-new/lib/netdev-nvos.c	2021-05-11 23:42:32.334864835 -0700
+@@ -0,0 +1,258 @@
++/*
++ * COPYRIGHT 2015 Pluribus Networks Inc.
++ *
++ * All rights reserved. This copyright notice is Copyright Management
++ * Information under 17 USC 1202 and is included to protect this work and
++ * deter copyright infringement.  Removal or alteration of this Copyright
++ * Management Information without the express written permission from
++ * Pluribus Networks Inc is prohibited, and any such unauthorized removal
++ * or alteration will be a violation of federal law.
++ */
++#include <config.h>
++
++#include "netdev-provider.h"
++#include "coverage.h"
++#include "openvswitch/vlog.h"
++#include <assert.h>
++#include <netinet/in.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <errno.h>
++#include <unistd.h>
++#include <sys/param.h>
++
++#define	LINUX 1
++
++#include "lib/ovs_nvos.h"
++
++VLOG_DEFINE_THIS_MODULE(netdev_nvos);
++COVERAGE_DEFINE(netdev_nvos_alloc);
++COVERAGE_DEFINE(netdev_nvos_get_etheraddr);
++
++// nvOS stuff
++#include "nv_types.h"
++#include "nv_string.h"
++#include "nv_netinet.h"
++#include "nvc_client.h"
++
++struct netdev_system {
++    struct netdev netdev;
++};
++
++struct netdev_rx_tap {
++	struct netdev_rxq netdev_rxq;
++};
++
++static struct netdev *
++netdev_nvos_alloc(void)
++{
++	COVERAGE_INC(netdev_nvos_alloc);
++	struct netdev *netdev = malloc(sizeof (struct netdev));
++	if (!netdev) {
++		VLOG_ERR("Error Allocating space for netdev structure\n");
++		return (NULL);
++	}
++	return (netdev);
++}
++
++static void
++netdev_nvos_dealloc(struct netdev *netdev)
++{
++	free(netdev);
++}
++
++static int
++netdev_nvos_construct(struct netdev *netdev OVS_UNUSED)
++{
++	return (0);
++}
++
++static void
++netdev_nvos_destruct(struct netdev *netdev OVS_UNUSED)
++{
++}
++
++static int
++nvc_show_port_config_func(void *arg, uint64_t fields OVS_UNUSED,
++    nvc_port_t *port_config)
++{
++	nvc_port_t *myconfig = (nvc_port_t *)arg;
++	memcpy(myconfig, port_config, sizeof (*myconfig));
++	seq_change(connectivity_seq_get());
++	return (0);
++}
++
++static int
++netdev_nvos_set_etheraddr(struct netdev *netdev,
++    const struct eth_addr mac OVS_UNUSED)
++   // const uint8_t mac[6] OVS_UNUSED)
++{
++        netdev_change_seq_changed(netdev);
++	return (-1);
++}
++
++static int
++netdev_get_port_config(nvc_port_t *config, int port)
++{
++	nvOS_io_t io;
++	int err;
++	nvOS_result_t result;
++	nvc_port_t filter;
++
++	err = do_nv_connect(&io);
++	if (err) {
++		VLOG_ERR("Failed to connect to nvOSd\n");
++		return (-1);
++	}
++	filter.port_id = port;
++	err = nvc_show_port_config(&io, nvc_port_id, &filter,
++	    nvc_show_port_config_func, (void *)config, &result);
++	if (err || (result.res_code != nvOS_SUCCESS)) {
++		VLOG_ERR("Failed to get port config\n");
++		do_nv_disconnect(&io);
++		return (-1);
++	}
++	do_nv_disconnect(&io);
++	return (0);
++
++}
++
++static int
++netdev_nvos_get_etheraddr(const struct netdev *netdev,
++    struct eth_addr *mac)
++    //uint8_t mac[ETH_ADDR_LEN])
++{
++	nvc_port_t config;
++	int port;
++	int err;
++
++	COVERAGE_INC(netdev_nvos_get_etheraddr);
++	port = nv_netdev_get_portno(netdev->name);
++	if (port < 0) {
++		return (-1);
++	}
++	err = netdev_get_port_config(&config, port);
++	if (err) {
++		return (-1);
++	}
++	memcpy(mac, config.port_mac_address, sizeof (ether_addr_t));
++	return (0);
++}
++
++static int
++netdev_nvos_update_flags(struct netdev *netdev,
++    enum netdev_flags off OVS_UNUSED,
++    enum netdev_flags on OVS_UNUSED, enum netdev_flags *old_flags)
++{
++	nvc_port_t config;
++	int port;
++	int err;
++
++	/*
++	 * We don't actually want to let ovs manipulate port settings
++	 * but we do need to report the status.
++	 */
++	port = nv_netdev_get_portno(netdev->name);
++	if (port < 0) {
++		*old_flags = NETDEV_UP;
++		return (0);
++	}
++
++	err = netdev_get_port_config(&config, port);
++	if (err) {
++		return (-1);
++	}
++	*old_flags = 0;
++	if (config.port_enable == nvc_PORT_ON) {
++		*old_flags |= NETDEV_UP;
++	}
++	return (0);
++}
++
++#define	NETDEV_NVOS_CLASS(NAME, PMD, RECONFIGURE)			\
++{                                                               \
++	NAME,                                                       \
++        PMD,                                                      \
++	NULL,                                          \
++        NULL, /* run */					  \
++	NULL, /* wait */                                          \
++                                                                \
++	netdev_nvos_alloc,                                         \
++	netdev_nvos_construct,                                     \
++	netdev_nvos_destruct,                                      \
++	netdev_nvos_dealloc,                                       \
++	NULL, /* get_config */                \
++	NULL, /* set_config */                \
++	NULL, /* get_tunnel_config */         \
++	NULL, /* build header */         \
++	NULL, /* push header */         \
++	NULL, /* pop header */         \
++	NULL, /* get_numa_id */         \
++	NULL, /* set_multiq */         \
++                                                                \
++	NULL, /* netdev_nvos_send */                                          \
++	NULL, /* netdev_nvos_send_wait */                                     \
++                                                                \
++	netdev_nvos_set_etheraddr,                      \
++	netdev_nvos_get_etheraddr,                                 \
++	NULL, /* netdev_nvos_get_mtu, */                             \
++	NULL, /* netdev_nvos_set_mtu, */                          \
++	NULL, /* netdev_nvos_get_ifindex, */                        \
++	NULL, /* netdev_nvos_get_carrier, */                                  \
++	NULL, /* netdev_nvos_get_carrier_resets, */                        \
++	NULL, /* netdev_nvos_set_miimon_interval, */                          \
++	NULL, /* GET_STATS, */                                        \
++	NULL, /* GET_CUSTOM_STATS, */                                        \
++                                                  \
++	NULL, /* GET_FEATURES, */                                    \
++	NULL, /* netdev_nvos_set_advertisements, */                  \
++                                                            \
++	NULL, /* netdev_pt_mode, */                          \
++	NULL, /* netdev_nvos_set_policing, */                          \
++	NULL, /* netdev_nvos_get_qos_types, */                        \
++	NULL, /* netdev_nvos_get_qos_capabilities, */              \
++	NULL, /* netdev_nvos_get_qos, */                       \
++	NULL, /* netdev_nvos_set_qos, */                       \
++	NULL, /* netdev_nvos_get_queue, */                       \
++	NULL, /* netdev_nvos_set_queue, */                       \
++	NULL, /* netdev_nvos_delete_queue, */             \
++	NULL, /* netdev_nvos_get_queue_stats, */             \
++	NULL, /* netdev_nvos_queue_dump_start, */             \
++	NULL, /* netdev_nvos_queue_dump_next, */             \
++	NULL, /* netdev_nvos_queue_dump_done, */             \
++	NULL, /* netdev_nvos_dump_queue_stats, */ \
++				\
++	/* NULL, */ /* netdev_nvos_get_in4 */ \
++	NULL, /* netdev_nvos_set_in4 */ \
++	/*NULL,*/ /* netdev_nvos_get_in6 */ \
++	NULL, /* netdev_nvos_get_addr_list */ \
++	NULL, /* netdev_nvos_add_router */              \
++	NULL, /* netdev_nvos_get_next_hop */              \
++	NULL, /* GET_STATUS */              \
++	NULL, /* netdev_nvos_arp_lookup */              \
++                                                                \
++	netdev_nvos_update_flags,                                   \
++        RECONFIGURE,                                                 \
++	NULL, /* netdev_nvos_rxq_alloc, */                    \
++	NULL, /* netdev_nvos_rxq_construct */                     \
++	NULL, /* netdev_nvos_rxq_destruct */                    \
++	NULL, /* netdev_nvos_rxq_dealloc */                     \
++	NULL, /* netdev_nvos_rxq_enabled, */                      \
++	NULL, /* netdev_nvos_rxq_recv, */                      \
++	NULL, /* netdev_nvos_rxq_wait, */                     \
++	NULL, /* netdev_nvos_rxq_drain, */                     \
++                                                                \
++	NULL, /* get_block_id, */                     \
++}
++
++const struct netdev_class netdev_nvos_tap_class =
++	NETDEV_NVOS_CLASS(
++		"nvos-tap", false, NULL);
++
++const struct netdev_class netdev_nvos_system_class =
++	NETDEV_NVOS_CLASS(
++		"nvos-system", false, NULL);
++
++const struct netdev_class netdev_nvos_internal_class =
++	NETDEV_NVOS_CLASS(
++		"nvos-internal", false, NULL);
+diff -uNr openvswitch-2.15.0/lib/netdev-provider.h openvswitch-2.15.0-new/lib/netdev-provider.h
+--- openvswitch-2.15.0/lib/netdev-provider.h	2021-02-10 12:05:42.085074628 -0800
++++ openvswitch-2.15.0-new/lib/netdev-provider.h	2021-05-11 04:48:15.157204278 -0700
+@@ -853,6 +853,13 @@
+ extern const struct netdev_class netdev_afxdp_class;
+ extern const struct netdev_class netdev_afxdp_nonpmd_class;
+ #endif
++
++#if defined(PLURIBUS) && defined(NVOS)
++extern const struct netdev_class netdev_nvos_internal_class;
++extern const struct netdev_class netdev_nvos_tap_class;
++extern const struct netdev_class netdev_nvos_system_class;
++#endif
++
+ #ifdef  __cplusplus
+ }
+ #endif
+diff -uNr openvswitch-2.15.0/lib/netdev.c openvswitch-2.15.0-new/lib/netdev.c
+--- openvswitch-2.15.0/lib/netdev.c	2021-02-10 12:05:42.086074628 -0800
++++ openvswitch-2.15.0-new/lib/netdev.c	2021-05-11 04:49:06.432207904 -0700
+@@ -166,6 +166,11 @@
+         netdev_register_provider(&netdev_internal_class);
+         netdev_vport_tunnel_register();
+ #endif
++#if defined(PLURIBUS) && defined(NVOS)
++	netdev_register_provider(&netdev_nvos_system_class);
++	netdev_register_provider(&netdev_nvos_internal_class);
++	netdev_register_provider(&netdev_nvos_tap_class);
++#endif
+         ovsthread_once_done(&once);
+     }
+ }
+diff -uNr openvswitch-2.15.0/lib/ovs_nvos.c openvswitch-2.15.0-new/lib/ovs_nvos.c
+--- openvswitch-2.15.0/lib/ovs_nvos.c	1969-12-31 16:00:00.000000000 -0800
++++ openvswitch-2.15.0-new/lib/ovs_nvos.c	2021-05-11 23:45:20.168876706 -0700
+@@ -0,0 +1,77 @@
++/*
++ * COPYRIGHT 2015 Pluribus Networks Inc.
++ *
++ * All rights reserved. This copyright notice is Copyright Management
++ * Information under 17 USC 1202 and is included to protect this work and
++ * deter copyright infringement.  Removal or alteration of this Copyright
++ * Management Information without the express written permission from
++ * Pluribus Networks Inc is prohibited, and any such unauthorized removal
++ * or alteration will be a violation of federal law.
++ */
++#include <config.h>
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <errno.h>
++#include <unistd.h>
++#include <sys/param.h>
++#include <assert.h>
++
++#define	LINUX 1
++
++#include "lib/ovs_nvos.h"
++#include "coverage.h"
++#include "openvswitch/vlog.h"
++
++VLOG_DEFINE_THIS_MODULE(ovs_nvos);
++COVERAGE_DEFINE(do_nv_connect);
++
++int
++do_nv_connect(nvOS_io_t *io)
++{
++	nvOS_result_t result;
++	int err;
++	char username[200];
++
++	COVERAGE_INC(do_nv_connect);
++	nvc_init(io);
++	err = nvc_connect(io);
++	if (err != 0) {
++		VLOG_ERR("failed to connect to nvOSd\n");
++		nvc_done(io);
++		return (-1);
++	}
++
++	err = nvc_check_uid(io, username, sizeof (username), &result);
++	if (err != 0 || result.res_status != nvOS_SUCCESS) {
++		VLOG_ERR("failed to check uid\n");
++		nvc_disconnect(io);
++		nvc_done(io);
++		return (-1);
++	}
++
++	return (0);
++}
++
++void
++do_nv_disconnect(nvOS_io_t *io)
++{
++	nvc_logout(io);
++	nvc_disconnect(io);
++	nvc_done(io);
++}
++
++int
++nv_netdev_get_portno(const char *devname)
++{
++	int portno;
++	char *endptr;
++	const char *startptr = devname + 1;
++
++	assert(devname[0] != '\0');
++	portno = strtoul(startptr, &endptr, 0);
++	if (endptr == startptr) {
++		return (-1);
++	}
++	return (portno);
++}
+diff -uNr openvswitch-2.15.0/lib/ovs_nvos.h openvswitch-2.15.0-new/lib/ovs_nvos.h
+--- openvswitch-2.15.0/lib/ovs_nvos.h	1969-12-31 16:00:00.000000000 -0800
++++ openvswitch-2.15.0-new/lib/ovs_nvos.h	2021-05-11 04:45:34.183192892 -0700
+@@ -0,0 +1,23 @@
++/*
++ * COPYRIGHT 2015 Pluribus Networks Inc.
++ *
++ * All rights reserved. This copyright notice is Copyright Management
++ * Information under 17 USC 1202 and is included to protect this work and
++ * deter copyright infringement.  Removal or alteration of this Copyright
++ * Management Information without the express written permission from
++ * Pluribus Networks Inc is prohibited, and any such unauthorized removal
++ * or alteration will be a violation of federal law.
++ */
++#ifndef	OVS_NVOS_H
++#define	OVS_NVOS_H
++
++#include "nv_types.h"
++#include "nv_string.h"
++#include "nv_netinet.h"
++#include "nvc_client.h"
++
++int do_nv_connect(nvOS_io_t *io);
++void do_nv_disconnect(nvOS_io_t *io);
++int nv_netdev_get_portno(const char *devname);
++
++#endif
+diff -uNr openvswitch-2.15.0/ofproto/ofproto-nvos.c openvswitch-2.15.0-new/ofproto/ofproto-nvos.c
+--- openvswitch-2.15.0/ofproto/ofproto-nvos.c	1969-12-31 16:00:00.000000000 -0800
++++ openvswitch-2.15.0-new/ofproto/ofproto-nvos.c	2021-05-11 23:46:37.176882153 -0700
+@@ -0,0 +1,1909 @@
++/*
++ * COPYRIGHT 2014 Pluribus Networks Inc.
++ *
++ * All rights reserved. This copyright notice is Copyright Management
++ * Information under 17 USC 1202 and is included to protect this work and
++ * deter copyright infringement.  Removal or alteration of this Copyright
++ * Management Information without the express written permission from
++ * Pluribus Networks Inc is prohibited, and any such unauthorized removal
++ * or alteration will be a violation of federal law.
++ */
++
++#include <config.h>
++
++#include "ofproto/ofproto-dpif.h"
++#include "ofproto/ofproto-provider.h"
++#include "openvswitch/ofp-actions.h"
++#include "lib/flow.h"
++#include "openvswitch/ofpbuf.h"
++#include "ofproto/connmgr.h"
++#include "lib/coverage.h"
++#include "openvswitch/vlog.h"
++
++#define LINUX 1
++
++#include "lib/ovs_nvos.h"
++#include "lib/netdev.h"
++#include "compiler.h"
++#include "openvswitch/ofp-print.h"
++#include "openvswitch/vlog.h"
++#include "dp-packet.h"
++#include "openvswitch/dynamic-string.h"
++
++#include <errno.h>
++#include <assert.h>
++
++// nvOS stuff
++#include "nv_types.h"
++#include "nv_string.h"
++#include "nv_netinet.h"
++#include "nvc_client.h"
++#include "nv_memory.h"
++
++#define	VLAN_TPID	0x8100u
++
++VLOG_DEFINE_THIS_MODULE(ofproto_nvos);
++
++/* Initial mappings of port to bridge mappings. */
++static struct shash init_ofp_ports = SHASH_INITIALIZER(&init_ofp_ports);
++
++typedef struct ofproto_nvos_s {
++	struct ofproto up;
++	struct sset ports;
++} ofproto_nvos_t;
++
++typedef struct rule_nvos_s {
++	struct rule up;
++	nvc_vflow_t vflow;
++	nv_fields_t fields;
++	nvOS_io_t snoop_io;
++	pthread_t snoop_tid;
++	struct ovs_mutex stats_lock;
++	nvc_vflow_stat_t stats OVS_GUARDED_BY(stats_lock);
++	long long int used;
++} rule_nvos_t;
++
++static int nv_ofproto_get_vlan(struct ofproto *ofproto);
++static int
++rule_action_set(rule_nvos_t *, const struct ofpact *, int);
++static int
++nv_send_packet(struct dp_packet *packet, const struct ofpact *ofpact,
++    ofproto_nvos_t *ofproto);
++
++static void
++nv_init(const struct shash *iface_hints)
++{
++	struct shash_node *node;
++
++	/* Make a local copy, since we don't own 'iface_hints' elements. */
++	SHASH_FOR_EACH(node, iface_hints) {
++		const struct iface_hint *orig_hint = node->data;
++		struct iface_hint *new_hint = xmalloc(sizeof (*new_hint));
++
++		new_hint->br_name = xstrdup(orig_hint->br_name);
++		new_hint->br_type = xstrdup(orig_hint->br_type);
++		new_hint->ofp_port = orig_hint->ofp_port;
++
++		shash_add(&init_ofp_ports, node->name, new_hint);
++	}
++	/* Get switch info */
++}
++
++static int
++nv_enumerate_names(const char *type OVS_UNUSED, struct sset *names OVS_UNUSED)
++{
++	return (0);
++}
++
++static void
++nv_enumerate_types(struct sset *types)
++{
++	sset_add(types, "nvos-system");
++}
++
++static int
++nv_del(const char *type OVS_UNUSED, const char *name OVS_UNUSED)
++{
++	/* Nothing needs to be done at this time */
++	return (0);
++}
++
++static struct ofproto *
++nv_alloc(void)
++{
++	ofproto_nvos_t *ofproto;
++	VLOG_INFO("nv_alloc\n");
++	ofproto = malloc(sizeof (ofproto_nvos_t));
++	return (&ofproto->up);
++}
++
++static ofproto_nvos_t *
++ofproto_nvos_cast(const struct ofproto *ofproto)
++{
++	assert(ofproto->ofproto_class == &ofproto_nvos_class);
++	return ((ofproto_nvos_t *)ofproto);
++}
++
++#define	N_TABLES 1
++
++static int
++nv_construct(struct ofproto *ofproto_)
++{
++	ofproto_nvos_t *ofproto;
++	VLOG_INFO("nv_construct\n");
++	ofproto = ofproto_nvos_cast(ofproto_);
++	ofproto_init_tables(ofproto_, N_TABLES);
++	sset_init(&ofproto->ports);
++	return (0);
++}
++
++static void
++nv_destruct(struct ofproto *ofproto_, bool del)
++{
++	ofproto_nvos_t *ofproto;
++	VLOG_INFO("nv_destruct\n");
++	ofproto = ofproto_nvos_cast(ofproto_);
++	sset_destroy(&ofproto->ports);
++	if (del) {
++		/* Just to make compilation pass */
++	}
++}
++
++static void
++nv_dealloc(struct ofproto *ofproto_)
++{
++	ofproto_nvos_t *ofproto = ofproto_nvos_cast(ofproto_);
++	free(ofproto);
++}
++
++static struct ofport *
++nv_port_alloc(void)
++{
++	struct ofport *port = malloc(sizeof (struct ofport));
++	return (port);
++}
++
++static void
++nv_port_dealloc(struct ofport *port)
++{
++	free(port);
++}
++
++static int
++nv_port_construct(struct ofport *port_)
++{
++	VLOG_INFO("nv_port_alloc %s %s\n", netdev_get_name(port_->netdev),
++	    port_->ofproto->name);
++	return (0);
++}
++
++static void
++nv_port_destruct(struct ofport *port_, bool del)
++{
++	VLOG_INFO("nv_port_alloc %s %s %i del=%c\n",
++	    netdev_get_name(port_->netdev),
++	    port_->ofproto->name, port_->ofp_port, del);
++}
++
++static int
++nv_port_add(struct ofproto *ofproto_, struct netdev *netdev)
++{
++	ofproto_nvos_t *ofproto;
++	VLOG_INFO("nv_port_add %s %s\n", ofproto_->name,
++	    netdev_get_name(netdev));
++	ofproto = ofproto_nvos_cast(ofproto_);
++	sset_add(&ofproto->ports, netdev_get_name(netdev));
++	return (0);
++}
++
++static int
++nv_port_query_by_name(const struct ofproto *ofproto_,
++	const char *devname, struct ofproto_port *port)
++{
++	int pp;
++
++	ofproto_nvos_t *ofproto;
++	ofproto = ofproto_nvos_cast(ofproto_);
++	if (!sset_contains(&ofproto->ports, devname)) {
++		return (ENODEV);
++	}
++	// assumes port name of pXX where XX = port number
++	pp = nv_netdev_get_portno(devname);
++	if (pp < 0) {
++		return (EINVAL);
++	}
++	port->ofp_port = pp;
++	port->name = xstrdup(devname);
++	port->type = xstrdup("system");
++	return (0);
++}
++
++static int
++nv_port_del(struct ofproto *ofproto_, ofp_port_t ofp_port)
++{
++	struct ofport *ofport = ofproto_get_port(ofproto_, ofp_port);
++	if (!ofport) {
++		VLOG_ERR("nv_port_del failed %s %i\n",
++		    ofproto_->name, ofp_port);
++		return (-1);
++	}
++	ofproto_nvos_t *ofproto = ofproto_nvos_cast(ofproto_);
++	VLOG_INFO("nv_port_del %s %s\n", ofproto_->name,
++	    netdev_get_name(ofport->netdev));
++	sset_find_and_delete(&ofproto->ports, netdev_get_name(ofport->netdev));
++	return (0);
++}
++
++static int
++nv_port_stats_show(void *arg, uint64_t fields OVS_UNUSED,
++    nvc_port_stats_t *port_stats)
++{
++	nvc_port_stats_t *stats = (nvc_port_stats_t *)arg;
++	memcpy(stats, port_stats, sizeof (*stats));
++	return (0);
++}
++
++
++static int
++nv_port_get_stats(const struct ofport *port,
++    struct netdev_stats *stats)
++{
++	nvOS_io_t io;
++	int err;
++	nvc_port_stats_t filter;
++	const char *name;
++	nvc_port_stats_t pstats;
++	int portno;
++	nvOS_result_t result;
++
++	err = do_nv_connect(&io);
++	if (err) {
++		return (-1);
++	}
++
++	name = netdev_get_name(port->netdev);
++	portno = nv_netdev_get_portno(name);
++	NVOS_PMAP_INIT(filter.port_num);
++	NVOS_PMAP_ADD(filter.port_num, portno);
++	err = nvc_show_port_stats(&io, nvc_port_stats_port_num, &filter,
++	    nv_port_stats_show, (void *)&pstats, &result);
++	if (err || result.res_status != nvOS_SUCCESS) {
++		VLOG_ERR("Failed to show port stats\n");
++		do_nv_disconnect(&io);
++		return (-1);
++	}
++	do_nv_disconnect(&io);
++
++	bzero(stats, sizeof (*stats));
++	stats->rx_packets = pstats.counters.ifInUcastPkts +
++	    pstats.counters.ifInBroadcastPkts +
++	    pstats.counters.ifInMulticastPkts;
++
++	stats->tx_packets = pstats.counters.ifOutUcastPkts +
++	    pstats.counters.ifOutBroadcastPkts +
++	    pstats.counters.ifOutMulticastPkts;
++	stats->rx_bytes = pstats.counters.ifInOctets;
++	stats->tx_bytes = pstats.counters.ifOutOctets;
++	stats->rx_errors = pstats.counters.ifInErrors;
++	stats->tx_errors = pstats.counters.ifOutErrors;
++	stats->rx_dropped = pstats.counters.ifInCongestionDropPkts;
++	stats->tx_dropped = pstats.counters.ifOutCongestionDropPkts;
++	stats->multicast = pstats.counters.ifInMulticastPkts;
++	return (0);
++}
++
++static int
++nv_port_dump_start(const struct ofproto *ofproto_, void **statep)
++{
++	ofproto_nvos_t *ofproto = ofproto_nvos_cast(ofproto_);
++	*statep = malloc(sizeof (const char **));
++	**(const char ***)statep = SSET_FIRST(&ofproto->ports);
++	VLOG_INFO("nv_port_dump_start %s\n", ofproto_->name);
++	return (0);
++}
++
++static int
++nv_port_dump_next(const struct ofproto *ofproto_, void *state,
++    struct ofproto_port *port)
++{
++	const char **name = (const char **)state;
++	ofproto_nvos_t *ofproto = ofproto_nvos_cast(ofproto_);
++	if (!(*name)) {
++		VLOG_INFO("Port dump done\n");
++		return (EOF);
++	} else {
++		VLOG_INFO("port dump %s\n", *name);
++		if (nv_port_query_by_name(ofproto_, *name, port)
++		    != 0) {
++			VLOG_INFO("Port dump error on %s\n",
++			    *name);
++			return (EOF);
++		}
++		*name = SSET_NEXT(&ofproto->ports, *name);
++		VLOG_INFO("port dump next %s\n", *name);
++	}
++	return (0);
++}
++
++static int
++nv_port_dump_done(const struct ofproto *ofproto OVS_UNUSED, void *state)
++{
++	free(state);
++	return (0);
++}
++
++static struct rule *
++nv_rule_alloc(void)
++{
++	rule_nvos_t *rule = malloc(sizeof (*rule));
++	return (&rule->up);
++}
++
++static void
++nv_rule_dealloc(struct rule *rule_)
++{
++	rule_nvos_t *rule = (rule_nvos_t *)rule_;
++	free(rule);
++}
++
++static int
++rule_stat_show_func(void *arg, uint64_t fields OVS_UNUSED,
++    nvc_vflow_stat_t *vflow_stat)
++{
++	nvc_vflow_stat_t *outstat = (nvc_vflow_stat_t *)arg;
++	memcpy(outstat, vflow_stat, sizeof (*vflow_stat));
++	return (0);
++}
++
++static void
++get_vflow_stats(rule_nvos_t *rule)
++{
++	int err;
++	nvOS_result_t result;
++	nvOS_io_t io;
++	nvc_vflow_stat_t *stat = &rule->stats;
++	uint64_t old_pkt_count = rule->stats.fstat_pkt_count;
++
++	err = do_nv_connect(&io);
++	if (err) {
++		VLOG_ERR("Failed to connect for show vflow stats\n");
++		return;
++	}
++	strlcpy(stat->fstat_name, rule->vflow.vflow_name,
++	    sizeof (stat->fstat_name));
++
++	ovs_mutex_lock(&rule->stats_lock);
++	err =  nvc_show_vflow_stat(&io, nvc_vflow_stat_name,
++	    stat, rule_stat_show_func,
++	    (void *)stat, &result);
++	if (err || (result.res_status != nvOS_SUCCESS)) {
++		VLOG_ERR("Failure in nvc_show_vflow_stat\n");
++		do_nv_disconnect(&io);
++		ovs_mutex_unlock(&rule->stats_lock);
++		return;
++	}
++	// update idle time
++	if (rule->stats.fstat_pkt_count != old_pkt_count) {
++		ovs_mutex_lock(&rule->up.mutex);
++		rule->used = time_msec();
++		ovs_mutex_unlock(&rule->up.mutex);
++	}
++	ovs_mutex_unlock(&rule->stats_lock);
++	do_nv_disconnect(&io);
++}
++
++static void
++nv_rule_get_stats(struct rule *rule_, struct pkt_stats *stats,
++    long long int *used)
++{
++	rule_nvos_t *rule = (rule_nvos_t *)rule_;
++	ovs_mutex_lock(&rule->stats_lock);
++	stats->n_packets = rule->stats.fstat_pkt_count;
++	stats->n_bytes = rule->stats.fstat_bytes;
++	stats->n_offload_packets = 0;	/* XXX */
++	stats->n_offload_bytes = 0;	/* XXX */
++	*used = rule->used;
++	ovs_mutex_unlock(&rule->stats_lock);
++}
++
++static void
++nv_rule_destruct(struct rule *rule_)
++{
++	rule_nvos_t *rule = (rule_nvos_t *)rule_;
++	ovs_mutex_destroy(&rule->stats_lock);
++}
++
++static enum ofperr
++nv_rule_construct(struct rule *rule_)
++{
++	rule_nvos_t *rule = (rule_nvos_t *)rule_;
++	bzero(&rule->stats, sizeof (rule->stats));
++	ovs_mutex_init(&rule->stats_lock);
++	return (0);
++}
++
++static int
++get_local_port_cb(void *arg, uint64_t fields OVS_UNUSED,
++    nvc_vport_info_t *port)
++{
++	int *portid = (int *)arg;
++	NVOS_PMAP_ITER(port->vp_pmap, *portid) {
++		// We only need one, so take the first one
++		VLOG_INFO("Got port id %d\n", *portid);
++		return (0);
++	}
++	return (0);
++}
++
++static int
++get_local_port(void)
++{
++	nvOS_io_t io;
++	int err;
++	uint64_t fields;
++	nvc_vport_info_t filter;
++	int portid = 0;
++	nvOS_result_t result;
++
++	err = do_nv_connect(&io);
++	if (err) {
++		VLOG_ERR("Failed to connect to nvOSd\n");
++		return (-1);
++	}
++	fields = nvc_vport_info_flags;
++	filter.vp_flags = nvc_NVOS_PORT_INTERNAL;
++	err = nvc_show_vports(&io, fields, &filter,
++	    get_local_port_cb, (void *)&portid, &result);
++	if (err || (result.res_code != nvOS_SUCCESS)) {
++		VLOG_ERR("Failed to get internal port\n");
++		if (!err) {
++			VLOG_ERR("%s\n", result.res_msg);
++		}
++		do_nv_disconnect(&io);
++		return (-1);
++	}
++	do_nv_disconnect(&io);
++	if (portid == 0) {
++		VLOG_ERR("Failed to get internal port. No matching entries\n");
++		return (-1);
++	}
++	return (portid);
++}
++
++static int
++cls_rule_to_vflow(struct cls_rule *rule, nvc_vflow_t *vflow,
++    nv_fields_t *fields, ofproto_nvos_t *ofproto, char **flowstr)
++{
++	struct flow *flow;
++	struct flow_wildcards *wc;
++	struct match match;
++	in6_addr_t v6nw_src, v6nw_dst;
++	in6_addr_t v6nw_src_wc, v6nw_dst_wc;
++	int ofp_port;
++	int i;
++
++	minimatch_expand(&rule->match, &match);
++	flow = &match.flow;
++	wc = &match.wc;
++	*flowstr = match_to_string(&match, NULL, OFP_DEFAULT_PRIORITY);
++
++	if (wc->masks.metadata || wc->masks.pkt_mark) {
++		VLOG_ERR("tunnel/metadata/pkt_mark not supported\n");
++		return (-1);
++	}
++
++	if (wc->masks.skb_priority) {
++		VLOG_ERR("skb priority not supported\n");
++		return (-1);
++	}
++
++	if (wc->masks.in_port.ofp_port) {
++		switch (flow->in_port.ofp_port) {
++			case OFPP_LOCAL:
++				ofp_port = get_local_port();
++				if (ofp_port < 0) {
++					VLOG_ERR("Can't get "
++					    "internal port id\n");
++					return (-1);
++				}
++				NVOS_PMAP_ADD(vflow->vflow_in_port,
++				    ofp_port);
++				break;
++			default:
++				ofp_port = flow->in_port.ofp_port;
++				NVOS_PMAP_ADD(vflow->vflow_in_port, ofp_port);
++				break;
++		}
++		NV_FIELDS_SET(*fields, nvc_vflow_in_port);
++	} else if (wc->masks.in_port.odp_port) {
++		VLOG_ERR("DPIF ports not supported\n");
++		return (-1);
++	}
++	if (!nv_mac_is_zero(wc->masks.dl_src.ea)) {
++		memcpy(vflow->vflow_src_mac_addr_mask, wc->masks.dl_src.ea,
++		    sizeof (vflow->vflow_src_mac_addr_mask));
++		memcpy(vflow->vflow_src_mac_addr, flow->dl_src.ea,
++		    sizeof (vflow->vflow_src_mac_addr));
++		NV_FIELDS_SET(*fields, nvc_vflow_src_mac_addr);
++		NV_FIELDS_SET(*fields, nvc_vflow_src_mac_addr_mask);
++	}
++	if (!nv_mac_is_zero(wc->masks.dl_dst.ea)) {
++		memcpy(vflow->vflow_dst_mac_addr_mask, wc->masks.dl_dst.ea,
++		    sizeof (vflow->vflow_dst_mac_addr_mask));
++		memcpy(vflow->vflow_dst_mac_addr, flow->dl_dst.ea,
++		    sizeof (vflow->vflow_dst_mac_addr));
++		NV_FIELDS_SET(*fields, nvc_vflow_dst_mac_addr);
++		NV_FIELDS_SET(*fields, nvc_vflow_dst_mac_addr_mask);
++	}
++
++	if (!nv_mac_is_zero(wc->masks.arp_sha.ea)) {
++		VLOG_ERR("arp_sha not supported\n");
++		return (-1);
++	}
++
++	if (!nv_mac_is_zero(wc->masks.arp_tha.ea)) {
++		VLOG_ERR("arp_tha not supported\n");
++		return (-1);
++	}
++
++	if (wc->masks.dl_type) {
++		vflow->vflow_ether_type = htons(flow->dl_type);
++		NV_FIELDS_SET(*fields, nvc_vflow_ether_type);
++	}
++
++	for (i = 0; i < FLOW_MAX_VLAN_HEADERS; i++) {
++		if (wc->masks.vlans[i].tci) {
++			/*
++			 * We strip out the vlan headers before
++			 * passing packets upstream, so ignore this
++			 */
++			if (flow->vlans[i].tci != 0) {
++				return (-1);
++			}
++			VLOG_ERR("vlan_tci not supported\n");
++		}
++	}
++	if (wc->masks.mpls_lse[0] || wc->masks.mpls_lse[1] ||
++	    wc->masks.mpls_lse[2]) {
++		VLOG_ERR("mpls_lse not supported\n");
++		return (-1);
++	}
++
++	if (!nv_addr_is_zero((in6_addr_t *)&wc->masks.ipv6_src)) {
++		memcpy(&vflow->vflow_src, &flow->ipv6_src,
++		    sizeof (vflow->vflow_src));
++		memcpy(&vflow->vflow_src_mask, &wc->masks.ipv6_src,
++		    sizeof (vflow->vflow_src_mask));
++		NV_FIELDS_SET(*fields, nvc_vflow_src_mask);
++		NV_FIELDS_SET(*fields, nvc_vflow_src);
++	}
++	if (!nv_addr_is_zero((in6_addr_t *)&wc->masks.ipv6_dst)) {
++		memcpy(&vflow->vflow_dst, &flow->ipv6_dst,
++		    sizeof (vflow->vflow_dst));
++		memcpy(&vflow->vflow_dst_mask, &wc->masks.ipv6_dst,
++		    sizeof (vflow->vflow_dst_mask));
++		NV_FIELDS_SET(*fields, nvc_vflow_dst_mask);
++		NV_FIELDS_SET(*fields, nvc_vflow_dst);
++	}
++
++	if (!nv_addr_is_zero((in6_addr_t *)&wc->masks.nd_target)) {
++		VLOG_ERR("nd_target not supported\n");
++		return (-1);
++	}
++
++	if (wc->masks.ipv6_label) {
++		VLOG_ERR("ipv6_label not supported\n");
++		return (-1);
++	}
++
++	nvOS_ipv4_to_v6(&wc->masks.nw_src, &v6nw_src_wc);
++	if (!nv_addr_is_zero(&v6nw_src_wc)) {
++		nvOS_ipv4_to_v6(&flow->nw_src, &v6nw_src);
++		memcpy(&vflow->vflow_src, &v6nw_src, sizeof (vflow->vflow_src));
++		memcpy(&vflow->vflow_src_mask, &v6nw_src_wc,
++		    sizeof (vflow->vflow_src_mask));
++		NV_FIELDS_SET(*fields, nvc_vflow_src_mask);
++		NV_FIELDS_SET(*fields, nvc_vflow_src);
++	}
++
++	nvOS_ipv4_to_v6(&wc->masks.nw_dst, &v6nw_dst_wc);
++	if (!nv_addr_is_zero(&v6nw_dst_wc)) {
++		nvOS_ipv4_to_v6(&flow->nw_dst, &v6nw_dst);
++		memcpy(&vflow->vflow_dst, &v6nw_dst, sizeof (vflow->vflow_dst));
++		memcpy(&vflow->vflow_dst_mask, &v6nw_dst_wc,
++		    sizeof (vflow->vflow_dst_mask));
++		NV_FIELDS_SET(*fields, nvc_vflow_dst_mask);
++		NV_FIELDS_SET(*fields, nvc_vflow_dst);
++	}
++
++	if (wc->masks.nw_frag || wc->masks.nw_ttl ||
++	    wc->masks.tcp_flags) {
++		VLOG_ERR("nw_frag/ttl not supported\n");
++		return (-1);
++	}
++
++	if (wc->masks.nw_tos) {
++		vflow->vflow_tos = flow->nw_tos;
++		NV_FIELDS_SET(*fields, nvc_vflow_tos);
++	}
++
++	if (wc->masks.nw_proto) {
++		vflow->vflow_proto = flow->nw_proto;
++		NV_FIELDS_SET(*fields, nvc_vflow_proto);
++	}
++
++	if (wc->masks.tp_src) {
++		vflow->vflow_src_port = htons(flow->tp_src);
++		NV_FIELDS_SET(*fields, nvc_vflow_src_port);
++	}
++	if (wc->masks.tp_dst) {
++		vflow->vflow_dst_port = htons(flow->tp_dst);
++		NV_FIELDS_SET(*fields, nvc_vflow_dst_port);
++	}
++
++	if (nv_fields_equal(fields, &nv_fields_none)) {
++		// Everything is wildcarded. As a shortcut let's use the vlan
++		vflow->vflow_type = nvc_FLOW_TYPE_OFLOW_DEFAULT;
++		NV_FIELDS_SET(*fields, nvc_vflow_vlan);
++		vflow->vflow_vlan = nv_ofproto_get_vlan(&ofproto->up);
++		VLOG_INFO("Default ofp vlan %i\n", vflow->vflow_vlan);
++		vflow->vflow_pri = NVOS_FLOW_PRI_OFLOW;
++	} else {
++		vflow->vflow_type = nvc_FLOW_TYPE_OFLOW;
++		vflow->vflow_pri = nv_max(NVOS_FLOW_PRI_OFLOW + 1,
++		    nv_min(NVOS_FLOW_PRI_MAX, rule->priority));
++	}
++	VLOG_INFO("Default ofp prio %i actual %i\n",
++	    rule->priority, vflow->vflow_pri);
++	NV_FIELDS_SET(*fields, nvc_vflow_pri);
++	NV_FIELDS_SET(*fields, nvc_vflow_type);
++
++	return (0);
++}
++
++static int
++ovs_action_to_vflow_action(const struct ofpact *ofpact, rule_nvos_t *rule)
++{
++	int port;
++	int internal_port;
++	nvc_vflow_t *vflow = &rule->vflow;
++	nv_fields_t *fields = &rule->fields;
++
++	if (ofpact->raw == OFPMBT13_DROP) {
++		VLOG_INFO("drop\n");
++	}
++
++	switch (ofpact->type) {
++	case OFPACT_OUTPUT:
++		VLOG_INFO("action output\n");
++		port = ofpact_get_OUTPUT(ofpact)->port;
++		switch (port) {
++		case OFPP_NORMAL:
++			NV_FIELDS_SET(*fields, nvc_vflow_action);
++			vflow->vflow_action = nvc_flow_action_flow_normal;
++			VLOG_INFO("action normal");
++			return (0);
++		case OFPP_CONTROLLER:
++			NV_FIELDS_SET(*fields, nvc_vflow_action);
++			vflow->vflow_action = nvc_flow_action_flow_to_cpu;
++			VLOG_INFO("action controller");
++			return (0);
++		case OFPP_LOCAL:
++			internal_port = get_local_port();
++			if (internal_port < 0) {
++				VLOG_ERR("Can't get internal port id\n");
++				return (-1);
++			}
++			port = internal_port;
++			break;
++		default:
++			break;
++		}
++		NV_FIELDS_SET(*fields, nvc_vflow_to_ports_arg);
++		NV_FIELDS_SET(*fields, nvc_vflow_action);
++		vflow->vflow_action = nvc_flow_action_flow_to_port;
++		NVOS_PMAP_INIT(vflow->vflow_to_ports_arg);
++		if (port != OFPP_CONTROLLER && port < NVOS_MAX_PORTS) {
++			NVOS_PMAP_ADD(vflow->vflow_to_ports_arg, port);
++		}
++		return (0);
++	case OFPACT_ENQUEUE:
++		VLOG_INFO("action enqueue\n");
++		return (-1);
++	case OFPACT_CONTROLLER:
++		VLOG_INFO("action controller\n");
++		NV_FIELDS_SET(*fields, nvc_vflow_action);
++		vflow->vflow_action = nvc_flow_action_flow_to_cpu;
++		return (0);
++	case OFPACT_OUTPUT_REG:
++		VLOG_INFO("action output_reg\n");
++		return (-1);
++	case OFPACT_BUNDLE:
++		VLOG_INFO("action bundle\n");
++		return (-1);
++	case OFPACT_SET_VLAN_VID:
++		VLOG_INFO("action set vlan vid\n");
++		NV_FIELDS_SET(*fields, nvc_vflow_arg);
++		NV_FIELDS_SET(*fields, nvc_vflow_action);
++		vflow->vflow_arg = ofpact_get_SET_VLAN_VID(ofpact)->vlan_vid;
++		VLOG_INFO("OFPACT_SET_VLAN_VID %i\n", vflow->vflow_arg);
++		vflow->vflow_action = nvc_flow_action_flow_setvlan;
++		return (0);
++	case OFPACT_SET_VLAN_PCP:
++		VLOG_INFO("action set vlan pcp\n");
++		return (-1);
++	case OFPACT_STRIP_VLAN:
++		VLOG_INFO("action strip vlan\n");
++		return (-1);
++	case OFPACT_PUSH_VLAN:
++		VLOG_INFO("action push vlan\n");
++		return (-1);
++	case OFPACT_SET_ETH_SRC:
++		VLOG_INFO("action set eth src\n");
++		return (-1);
++	case OFPACT_SET_ETH_DST:
++		NV_FIELDS_SET(*fields, nvc_vflow_set_mac_arg);
++		NV_FIELDS_SET(*fields, nvc_vflow_action);
++		vflow->vflow_action = nvc_flow_action_flow_set_dmac;
++		memcpy(vflow->vflow_set_mac_arg,
++		    ofpact_get_SET_ETH_DST(ofpact)->mac.ea,
++		    sizeof (vflow->vflow_set_mac_arg));
++		VLOG_INFO("action set eth dst\n");
++		return (0);
++	case OFPACT_SET_IPV4_SRC:
++		VLOG_INFO("action set ipv4 src\n");
++		return (-1);
++	case OFPACT_SET_IPV4_DST:
++		VLOG_INFO("action set ipv4 dst\n");
++		return (-1);
++	case OFPACT_SET_IP_DSCP:
++		NV_FIELDS_SET(*fields, nvc_vflow_action);
++		NV_FIELDS_SET(*fields, nvc_vflow_arg);
++		vflow->vflow_action = nvc_flow_action_flow_setdscp;
++		vflow->vflow_arg = ofpact_get_SET_IP_DSCP(ofpact)->dscp;
++		VLOG_INFO("action set ip dscp\n");
++		return (0);
++	case OFPACT_SET_IP_ECN:
++		VLOG_INFO("action set ip ecn\n");
++		return (-1);
++	case OFPACT_SET_IP_TTL:
++		VLOG_INFO("action set ip ttl\n");
++		return (-1);
++	case OFPACT_SET_L4_SRC_PORT:
++		VLOG_INFO("action set l4 src port\n");
++		return (-1);
++	case OFPACT_SET_L4_DST_PORT:
++		VLOG_INFO("action set l4 dst port\n");
++		return (-1);
++	case OFPACT_REG_MOVE:
++		VLOG_INFO("action reg move\n");
++		return (-1);
++	case OFPACT_SET_FIELD:
++		VLOG_INFO("action set field\n");
++		return (-1);
++	case OFPACT_STACK_PUSH:
++		VLOG_INFO("action stack push\n");
++		return (-1);
++	case OFPACT_STACK_POP:
++		VLOG_INFO("action stack pop \n");
++		return (-1);
++	case OFPACT_DEC_TTL:
++		VLOG_INFO("action dec ttl\n");
++		return (-1);
++	case OFPACT_SET_MPLS_LABEL:
++		VLOG_INFO("action set mpls label\n");
++		return (-1);
++	case OFPACT_SET_MPLS_TC:
++		VLOG_INFO("action set mpls tc\n");
++		return (-1);
++	case OFPACT_SET_MPLS_TTL:
++		VLOG_INFO("action set mpls ttl\n");
++		return (-1);
++	case OFPACT_DEC_MPLS_TTL:
++		VLOG_INFO("action dec mpls ttl\n");
++		return (-1);
++	case OFPACT_SET_TUNNEL:
++		VLOG_INFO("action set tunnel\n");
++		NV_FIELDS_SET(*fields, nvc_vflow_arg);
++		NV_FIELDS_SET(*fields, nvc_vflow_action);
++		vflow->vflow_arg = ofpact_get_SET_TUNNEL(ofpact)->tun_id;
++		VLOG_INFO("OFPACT_SET_TUNNEL %i\n", vflow->vflow_arg);
++		vflow->vflow_action = nvc_flow_action_flow_set_tunnel_id;
++		return (0);
++	case OFPACT_WRITE_METADATA:
++		VLOG_INFO("action write metadata\n");
++		return (-1);
++	case OFPACT_SET_QUEUE:
++		VLOG_INFO("action set queue\n");
++		return (-1);
++	case OFPACT_POP_QUEUE:
++		VLOG_INFO("action pop queue\n");
++		return (-1);
++	case OFPACT_FIN_TIMEOUT:
++		VLOG_INFO("action timeout\n");
++		return (-1);
++	case OFPACT_RESUBMIT:
++		VLOG_INFO("action resubmit\n");
++		return (-1);
++	case OFPACT_LEARN:
++		VLOG_INFO("action learn\n");
++		return (-1);
++	case OFPACT_CONJUNCTION:
++		VLOG_INFO("action conjunction\n");
++		return (-1);
++	case OFPACT_MULTIPATH:
++		VLOG_INFO("action multipath\n");
++		return (-1);
++	case OFPACT_NOTE:
++		VLOG_INFO("action note\n");
++		return (-1);
++	case OFPACT_EXIT:
++		VLOG_INFO("action exit\n");
++		return (-1);
++	case OFPACT_PUSH_MPLS:
++		VLOG_INFO("action push mpls\n");
++		return (-1);
++	case OFPACT_POP_MPLS:
++		VLOG_INFO("action pop mpls\n");
++		return (-1);
++	case OFPACT_SAMPLE:
++		VLOG_INFO("action sample\n");
++		return (-1);
++	case OFPACT_UNROLL_XLATE:
++		VLOG_INFO("action unroll xlate\n");
++		return (-1);
++	case OFPACT_CLEAR_ACTIONS:
++		VLOG_INFO("action clear actions\n");
++		return (-1);
++	case OFPACT_WRITE_ACTIONS:
++		VLOG_INFO("action write actions\n");
++		struct ofpact_nest *nest = ofpact_get_WRITE_ACTIONS(ofpact);
++		rule_action_set(rule, nest->actions,
++		    ofpact_nest_get_action_len(nest));
++		return (0);
++	case OFPACT_GOTO_TABLE:
++		VLOG_INFO("action goto table\n");
++		return (-1);
++	case OFPACT_METER:
++		VLOG_INFO("action meter\n");
++		return (-1);
++	case OFPACT_GROUP:
++		VLOG_INFO("action group\n");
++		return (-1);
++	case OFPACT_CT:
++		VLOG_INFO("action ct\n");
++		return (-1);
++	case OFPACT_DEBUG_RECIRC:
++		VLOG_INFO("action debug recirc\n");
++		return (-1);
++	case OFPACT_NAT:
++		VLOG_INFO("action nat\n");
++		return (-1);
++	case OFPACT_OUTPUT_TRUNC:
++		VLOG_INFO("action output trunc\n");
++		return (-1);
++	case OFPACT_DEC_NSH_TTL:
++		VLOG_INFO("action dec nsh ttl\n");
++		return (-1);
++	case OFPACT_DELETE_FIELD:
++		VLOG_INFO("action delete field\n");
++		return (-1);
++	case OFPACT_ENCAP:
++		VLOG_INFO("action encap\n");
++		return (-1);
++	case OFPACT_DECAP:
++		VLOG_INFO("action decap\n");
++		return (-1);
++	case OFPACT_CT_CLEAR:
++		VLOG_INFO("action ct clear\n");
++		return (-1);
++	case OFPACT_CLONE:
++		VLOG_INFO("action clone\n");
++		return (-1);
++	case OFPACT_CHECK_PKT_LARGER:
++		VLOG_INFO("action packet larger\n");
++		return (-1);
++	case OFPACT_DEBUG_SLOW:
++		VLOG_INFO("action debug slow\n");
++		return (-1);
++	default:
++		VLOG_INFO("action not supported\n");
++		return (-1);
++	}
++}
++
++static int
++//nvOS_pkt_to_ofproto_pkt(nvOS_packet_t *in_pkt, struct ofproto_packet_in *pin)
++nvOS_pkt_to_ofproto_pkt(nvOS_packet_t *in_pkt, struct ofproto_async_msg *am)
++{
++	uint32_t			data_len;
++	uint8_t				*data_ptr;
++	uint32_t			new_data_len;
++	uint8_t				*new_data_ptr;
++	nv_ether_header_t		*new_ehp;
++	nv_ether_header_t		*ehp;
++	nv_ether_vlan_header_t		*evh;
++
++	data_len = in_pkt->pkt_size;
++	data_ptr = (uint8_t *)in_pkt->pkt_data;
++
++	if (data_len < sizeof (nv_ether_header_t)) {
++		return (-1);
++	}
++
++	/*
++	 * parse the incoming packet and strip out the vlan header always.
++	 */
++	ehp = (nv_ether_header_t *)data_ptr;
++	if (ntohs(ehp->ether_type) == VLAN_TPID) {
++		if (data_len < sizeof (nv_ether_vlan_header_t)) {
++			return (-1);
++		}
++
++		evh = (nv_ether_vlan_header_t *)ehp;
++
++		/*
++		 * calculate the size of the new buffer without the
++		 * vlan header
++		 */
++		new_data_len = data_len - sizeof (nv_ether_vlan_header_t) +
++		    sizeof (nv_ether_header_t);
++
++		new_data_ptr = nv_malloc(new_data_len);
++
++		new_ehp = (nv_ether_header_t *)new_data_ptr;
++
++		/* fill the new ethernet header */
++		memcpy(&new_ehp->ether_dhost, &evh->ether_dhost,
++		    sizeof (ether_addr_t));
++		memcpy(&new_ehp->ether_shost, &evh->ether_shost,
++		    sizeof (ether_addr_t));
++		new_ehp->ether_type = evh->ether_type;
++		memcpy(new_ehp + 1, evh + 1,
++		    data_len - sizeof (nv_ether_vlan_header_t));
++
++	} else {
++
++		new_data_ptr = nv_malloc(data_len);
++		new_data_len = data_len;
++		memcpy(new_data_ptr, data_ptr, data_len);
++	}
++
++	/* store the created buffer/size in nvOS_packet_t */
++	am->pin.up.base.packet = (char *)new_data_ptr;
++	am->pin.up.base.packet_len = new_data_len;
++//	pin->up.packet = (char *)new_data_ptr;
++//	pin->up.packet_len = new_data_len;
++	return (0);
++}
++
++static int
++pkt_to_controller(void *arg, nvOS_packet_t *pkt)
++{
++	/* Can assume action of OFPACT_CONTROLLER */
++	//struct ofproto_packet_in pin;
++	struct ofproto_async_msg am;
++	rule_nvos_t *rule = (rule_nvos_t *)arg;
++	const struct ofpact *ofpact;
++	const struct rule_actions *actions;
++
++	VLOG_INFO("sending packet to controller\n");
++	bzero(&am, sizeof (am));
++	nvOS_pkt_to_ofproto_pkt(pkt, &am);
++	//nvOS_pkt_to_ofproto_pkt(pkt, &pin);
++//	pin.up.fmd.in_port = pkt->pkt_port;
++
++	actions = rule_get_actions(&rule->up);
++	OFPACT_FOR_EACH(ofpact, actions->ofpacts, actions->ofpacts_len) {
++		if (ofpact->type == OFPACT_CONTROLLER) {
++			break;
++		}
++	}
++	if (ofpact->type == OFPACT_CONTROLLER &&
++	    ofpact->len > 0) {
++		VLOG_INFO("Sending packet ofpact controller\n");
++		am.controller_id =
++		    ofpact_get_CONTROLLER(ofpact)->controller_id;
++		am.pin.max_len = ofpact_get_CONTROLLER(ofpact)->max_len;
++		//pin.miss_type = OFPROTO_PACKET_IN_NO_MISS;
++		am.pin.up.base.reason =
++		    ofpact_get_CONTROLLER(ofpact)->reason;
++		am.pin.up.base.table_id = rule->up.table_id;
++		am.pin.up.base.cookie = rule->up.flow_cookie;
++		/*
++		pin.controller_id =
++		    ofpact_get_CONTROLLER(ofpact)->controller_id;
++		pin.send_len = ofpact_get_CONTROLLER(ofpact)->max_len;
++		pin.miss_type = OFPROTO_PACKET_IN_NO_MISS;
++		pin.up.reason = ofpact_get_CONTROLLER(ofpact)->reason;
++		pin.up.table_id = rule->up.table_id;
++		pin.up.cookie = rule->up.flow_cookie;
++		*/
++	} else {
++		VLOG_INFO("Sending packet miss to controller\n");
++		am.controller_id = 0;
++		am.pin.max_len = 2000;
++		//pin.miss_type = OFPROTO_PACKET_IN_NO_MISS;
++		am.pin.up.base.reason = OFPR_NO_MATCH;
++
++		am.pin.up.base.table_id = rule->up.table_id;
++		am.pin.up.base.cookie = rule->up.flow_cookie;
++	}
++	connmgr_send_async_msg(rule->up.ofproto->connmgr, &am);
++	free((void *)am.pin.up.base.packet);
++	return (0);
++}
++
++static void *
++snoop_thread_func(void *arg)
++{
++	int err;
++	nvOS_result_t result;
++	rule_nvos_t *rule;
++	nvc_vsnoop_args_t vsnoop_args;
++	nv_fields_t fields;
++
++	rule = (rule_nvos_t *)arg;
++	vsnoop_args.vsa_count = -1;
++	vsnoop_args.vsa_packet_size = 0;
++	memcpy(&vsnoop_args.vsa_vflow, &rule->vflow, sizeof (rule->vflow));
++	fields = nv_fields_none;
++	NV_FIELDS_SET(fields, nvc_vsnoop_args_vflow_name);
++	err = nvc_snoop_vflow(&rule->snoop_io, fields,
++	    &vsnoop_args, pkt_to_controller, arg, &result);
++	if (err) {
++		VLOG_ERR("error snooping vflow\n");
++	}
++	do_nv_disconnect(&rule->snoop_io);
++	return (NULL);
++}
++
++static inline boolean_t
++vflow_action_is_output_action(nvc_flow_action_t action)
++{
++	switch (action) {
++	case nvc_flow_action_flow_to_port:
++	case nvc_flow_action_flow_to_ports_and_cpu:
++	case nvc_flow_action_flow_to_cpu:
++	case nvc_flow_action_flow_l3_to_cpu_switch:
++		return (true);
++	case nvc_flow_action_flow_normal:
++	case nvc_flow_action_flow_drop:
++	case nvc_flow_action_flow_drop_cancel_trap:
++	case nvc_flow_action_flow_trap:
++	case nvc_flow_action_flow_copy_to_cpu:
++	case nvc_flow_action_flow_copy_to_port:
++	case nvc_flow_action_flow_verify:
++	case nvc_flow_action_flow_setvlan:
++	case nvc_flow_action_flow_setvlan2:
++	case nvc_flow_action_flow_tunnel_frame:
++	case nvc_flow_action_flow_set_tunnel_id:
++	case nvc_flow_action_flow_to_span:
++	case nvc_flow_action_flow_to_port_setvlan2:
++	case nvc_flow_action_flow_to_cpu_rx:
++	case nvc_flow_action_flow_to_cpu_rx_tx:
++	case nvc_flow_action_flow_to_cpu_l2_miss:
++	case nvc_flow_action_flow_set_metadata:
++	case nvc_flow_action_flow_flood:
++	case nvc_flow_action_flow_setdscp:
++	case nvc_flow_action_flow_decap:
++	case nvc_flow_action_flow_set_dmac:
++	case nvc_flow_action_flow_to_next_hop_ip:
++	case nvc_flow_action_flow_to_ecmp_group:
++	case nvc_flow_action_flow_set_smac:
++	case nvc_flow_action_flow_set_dmac_to_port:
++	case nvc_flow_action_flow_set_vlan_pri:
++	case nvc_flow_action_flow_tcp_seq_offset:
++	case nvc_flow_action_flow_tcp_ack_offset:
++	case nvc_flow_action_flow_add_outer_vlan:
++	case nvc_flow_action_flow_set_tpid:
++	case nvc_flow_action_flow_to_port_set_vlan:
++	case nvc_flow_action_flow_redirect_to_vrouter:
++	case nvc_flow_action_flow_to_vp:
++	case nvc_flow_action_flow_set_svp:
++	case nvc_flow_action_flow_cancel_switch_to_cpu:
++		return (false);
++	}
++	return (false);
++}
++
++static inline boolean_t
++vflow_action_is_to_cpu_action(nvc_flow_action_t action)
++{
++	switch (action) {
++	case nvc_flow_action_flow_to_ports_and_cpu:
++	case nvc_flow_action_flow_to_cpu:
++	case nvc_flow_action_flow_l3_to_cpu_switch:
++		return (true);
++	case nvc_flow_action_flow_to_port:
++	case nvc_flow_action_flow_normal:
++	case nvc_flow_action_flow_drop:
++	case nvc_flow_action_flow_drop_cancel_trap:
++	case nvc_flow_action_flow_trap:
++	case nvc_flow_action_flow_copy_to_cpu:
++	case nvc_flow_action_flow_copy_to_port:
++	case nvc_flow_action_flow_verify:
++	case nvc_flow_action_flow_setvlan:
++	case nvc_flow_action_flow_setvlan2:
++	case nvc_flow_action_flow_tunnel_frame:
++	case nvc_flow_action_flow_set_tunnel_id:
++	case nvc_flow_action_flow_to_span:
++	case nvc_flow_action_flow_to_port_setvlan2:
++	case nvc_flow_action_flow_to_cpu_rx:
++	case nvc_flow_action_flow_to_cpu_rx_tx:
++	case nvc_flow_action_flow_to_cpu_l2_miss:
++	case nvc_flow_action_flow_set_metadata:
++	case nvc_flow_action_flow_flood:
++	case nvc_flow_action_flow_setdscp:
++	case nvc_flow_action_flow_decap:
++	case nvc_flow_action_flow_set_dmac:
++	case nvc_flow_action_flow_to_next_hop_ip:
++	case nvc_flow_action_flow_to_ecmp_group:
++	case nvc_flow_action_flow_set_smac:
++	case nvc_flow_action_flow_set_dmac_to_port:
++	case nvc_flow_action_flow_set_vlan_pri:
++	case nvc_flow_action_flow_tcp_seq_offset:
++	case nvc_flow_action_flow_tcp_ack_offset:
++	case nvc_flow_action_flow_add_outer_vlan:
++	case nvc_flow_action_flow_set_tpid:
++	case nvc_flow_action_flow_to_port_set_vlan:
++	case nvc_flow_action_flow_redirect_to_vrouter:
++	case nvc_flow_action_flow_to_vp:
++	case nvc_flow_action_flow_set_svp:
++	case nvc_flow_action_flow_cancel_switch_to_cpu:
++		return (false);
++	}
++	return (false);
++}
++
++static int
++rule_action_set(rule_nvos_t *rule,
++    const struct ofpact *ofpacts,
++    int ofpacts_len)
++{
++	const struct ofpact *ofpact;
++	int nactions = 0;
++	int port;
++
++	if (ofpacts_len == 0) {
++		VLOG_INFO("nactions %i assuming drop\n", ofpacts_len);
++		rule->vflow.vflow_action = nvc_flow_action_flow_drop;
++		NV_FIELDS_SET(rule->fields, nvc_vflow_action);
++	}
++
++	OFPACT_FOR_EACH(ofpact, ofpacts, ofpacts_len) {
++		if (nactions > 1) {
++			/* Check special cases for compound actions */
++			if ((rule->vflow.vflow_action ==
++			    nvc_flow_action_flow_set_dmac) &&
++			    (ofpact->type == OFPACT_OUTPUT)) {
++				/*
++				 * The setup for set_dmac is already done
++				 * need to add the to_port part
++				 */
++				NV_FIELDS_SET(rule->fields, nvc_vflow_arg);
++				rule->vflow.vflow_action =
++				    nvc_flow_action_flow_set_dmac_to_port;
++				rule->vflow.vflow_arg =
++				    ofpact_get_OUTPUT(ofpact)->port;
++				VLOG_INFO("action set eth dst and output\n");
++			} else if (
++			    vflow_action_is_output_action(
++			    rule->vflow.vflow_action) &&
++			    (ofpact->type == OFPACT_OUTPUT ||
++			    ofpact->type == OFPACT_CONTROLLER)) {
++				/*
++				 * Output to multiple ports scenario.
++				 * Outputting to controller/cpu
++				 * is basically like sending to the
++				 * logical controller port
++				 * however, since vflow doesn't treat
++				 * it as such, and also doesn't allow
++				 * multiple actions, we have to treat
++				 * to_cpu action and CONTROLLER logical
++				 * port as special compound actions
++				 */
++				if (rule->vflow.vflow_action ==
++				    nvc_flow_action_flow_to_cpu) {
++					NV_FIELDS_SET(rule->fields,
++					    nvc_vflow_to_ports_arg);
++					NV_FIELDS_SET(rule->fields,
++					    nvc_vflow_action);
++					NVOS_PMAP_INIT(
++					    rule->vflow.vflow_to_ports_arg);
++					rule->vflow.vflow_action =
++					    nvc_flow_action_flow_to_ports_and_cpu;
++				}
++				port = ofpact_get_OUTPUT(ofpact)->port;
++				if (port == OFPP_CONTROLLER ||
++				    vflow_action_is_to_cpu_action(
++				    rule->vflow.vflow_action)) {
++					rule->vflow.vflow_action =
++					    nvc_flow_action_flow_to_ports_and_cpu;
++				}
++				if (port != OFPP_CONTROLLER &&
++				    port < NVOS_MAX_PORTS) {
++					NVOS_PMAP_ADD(
++					    rule->vflow.vflow_to_ports_arg,
++					    port);
++				}
++				VLOG_INFO("Rule action multiple output\n");
++			} else {
++				VLOG_ERR("Rule action "
++				    "combination not supported\n");
++				return (-1);
++			}
++		} else if (ovs_action_to_vflow_action(ofpact, rule) != 0) {
++			return (-1);
++		}
++		nactions++;
++	}
++	VLOG_INFO("nactions %i\n", nactions);
++	return (0);
++}
++
++static int g_vflow_count = 0;
++
++static int
++nv_start_vflow_thread(rule_nvos_t *rule)
++{
++	int err;
++	err = do_nv_connect(&rule->snoop_io);
++	if (err) {
++		VLOG_ERR("failed to connect to nvOSd to snoop\n");
++		return (-1);
++	}
++	err = pthread_create(&rule->snoop_tid, NULL,
++	    snoop_thread_func, (void *)rule);
++	if (err) {
++		VLOG_ERR("Failed to create snoop thread\n");
++		return (-1);
++	}
++	return (0);
++}
++
++static enum ofperr
++nv_rule_insert(struct rule *rule_, struct rule *old_rule_, bool forward_stats)
++    OVS_REQUIRES(ofproto_mutex)
++{
++	struct cls_rule cr = rule_->cr;
++	const struct rule_actions *actions = rule_get_actions(rule_);
++	int err;
++	nvOS_result_t result;
++	nvOS_io_t io;
++	char *flowstr = NULL;
++	struct ds actstr;
++
++	VLOG_INFO("********** RULE_INSERT **********\n");
++	/*
++	 * TODO: Add valid use of old_rule_ and forward_stats.
++	 */
++	if (old_rule_ != NULL) {
++		VLOG_INFO("**** OLD RULE FOUND ****");
++	}
++	if (forward_stats == B_TRUE) {
++		VLOG_INFO("**** FORWARD STATS TO NEW RULE ****");
++	}
++	rule_nvos_t *rule = (rule_nvos_t *)rule_;
++	rule->fields = nv_fields_none;
++	ofproto_nvos_t *ofproto = ofproto_nvos_cast(rule->up.ofproto);
++	bzero(&rule->vflow, sizeof (rule->vflow));
++	if (cls_rule_to_vflow(&cr, &rule->vflow, &rule->fields,
++	    ofproto, &flowstr) != 0) {
++		free(flowstr);
++		return (0);
++	}
++
++	if (rule_action_set(rule, actions->ofpacts, actions->ofpacts_len) < 0) {
++		free(flowstr);
++		return (0);
++	}
++
++	rule->vflow.vflow_scope = nvOS_SCOPE_LOCAL;
++	snprintf(rule->vflow.vflow_name, sizeof (rule->vflow.vflow_name),
++	    "OVS_FLOW_%i", g_vflow_count);
++	NV_FIELDS_SET(rule->fields, nvc_vflow_scope);
++	NV_FIELDS_SET(rule->fields, nvc_vflow_name);
++	NV_FIELDS_SET(rule->fields, nvc_vflow_transient);
++	rule->vflow.vflow_transient = true;
++	g_vflow_count++;
++	err = do_nv_connect(&io);
++	if (err) {
++		VLOG_ERR("Failed to connect to nvOSd\n");
++		free(flowstr);
++		return (0);
++	}
++
++	err = nvc_create_vflow(&io, rule->fields, &rule->vflow, &result);
++	if (err || result.res_status != nvOS_SUCCESS) {
++		VLOG_ERR("failed to create vflow %s %s %s\n",
++		    rule->vflow.vflow_name, flowstr, result.res_msg);
++		do_nv_disconnect(&io);
++		free(flowstr);
++		return (0);
++	}
++	ds_init(&actstr);
++	struct ofpact_format_params fp = { .s = &actstr };
++	ofpacts_format(actions->ofpacts, actions->ofpacts_len, &fp);
++	VLOG_INFO("Inserted %s %s %s\n", rule->vflow.vflow_name, flowstr,
++	    ds_cstr(&actstr));
++	/* If to cpu type we must set up snoop */
++	if (vflow_action_is_to_cpu_action(rule->vflow.vflow_action)) {
++		err = nv_start_vflow_thread(rule);
++		if (err) {
++			err = nvc_delete_vflow(&io, rule->fields,
++			    &rule->vflow, &result);
++			do_nv_disconnect(&io);
++			if (err || (result.res_code != nvOS_SUCCESS)) {
++				/*
++				 * This is really bad. If we return error,
++				 * we are supposed to back out all changes.
++				 * If we hit this, we have failed to do that.
++				 * This leaves ovs and nvOSd in inconsistent
++				 * states.
++				 */
++				abort();
++			}
++			free(flowstr);
++			ds_destroy(&actstr);
++			return (0);
++		}
++	}
++
++	do_nv_disconnect(&io);
++	free(flowstr);
++	ds_destroy(&actstr);
++	rule->used = time_msec();
++	return (0);
++}
++
++static int
++nv_cancel_snoop(rule_nvos_t *rule)
++{
++	int err;
++	nvOS_io_t io;
++	nvOS_result_t result;
++	void *status;
++
++	nvc_init(&io);
++	err = nvc_connect(&io);
++	if (err) {
++		VLOG_ERR("Failed to connect to nvOSd\n");
++		return (-1);
++	}
++	err = nvc_share_session(&io, &rule->snoop_io);
++	if (err != 0) {
++		VLOG_ERR("failed to share session\n");
++		do_nv_disconnect(&io);
++		return (-1);
++	}
++	err = nvc_cancel_stream_command(&io, &result);
++	if (err != 0) {
++		VLOG_ERR("failed to cancel snoop\n");
++		do_nv_disconnect(&io);
++		return (-1);
++	}
++	err = pthread_join(rule->snoop_tid, &status);
++	if (err) {
++		VLOG_ERR("Error joining snoop thread %d\n", err);
++	}
++	nvc_disconnect(&io);
++	nvc_done(&io);
++	return (0);
++}
++
++#if 0
++static void
++nv_rule_modify_actions(struct rule *rule_, bool reset_counters OVS_UNUSED)
++{
++#define	REVERT_FLOW_FIELDS() \
++	rule->fields = old_fields; \
++	memcpy(&rule->vflow, &old_vflow, sizeof (rule->vflow));
++
++	nvOS_io_t io;
++	nvOS_result_t result;
++	const struct rule_actions *actions = rule_get_actions(rule_);
++	int err;
++	rule_nvos_t *rule = (rule_nvos_t *)rule_;
++	nvc_vflow_t old_vflow;
++	nv_fields_t old_fields;
++	nv_fields_t mod_fields;
++
++	VLOG_INFO("Modifying flow %s\n", rule->vflow.vflow_name);
++
++	old_fields = rule->fields;
++	memcpy(&old_vflow, &rule->vflow, sizeof (old_vflow));
++
++	if (vflow_action_is_to_cpu_action(rule->vflow.vflow_action)) {
++		nv_cancel_snoop(rule);
++	}
++
++	NV_FIELDS_CLEAR(rule->fields, nvc_vflow_action);
++	NV_FIELDS_CLEAR(rule->fields, nvc_vflow_arg);
++
++	if (rule_action_set(rule, actions->ofpacts, actions->ofpacts_len) < 0) {
++		REVERT_FLOW_FIELDS();
++		return;
++	}
++
++	mod_fields = nv_fields_none;
++	if (NV_FIELDS_TEST(rule->fields, nvc_vflow_action)) {
++		NV_FIELDS_SET(mod_fields, nvc_vflow_action);
++	}
++	if (NV_FIELDS_TEST(rule->fields, nvc_vflow_arg)) {
++		NV_FIELDS_SET(mod_fields, nvc_vflow_arg);
++	}
++	NV_FIELDS_SET(mod_fields, nvc_vflow_name);
++
++	err = do_nv_connect(&io);
++	if (err) {
++		REVERT_FLOW_FIELDS();
++		VLOG_ERR("Failed to connect to nvOSd\n");
++		return;
++	}
++	err = nvc_update_vflow(&io, mod_fields, &rule->vflow, &result);
++	if (err || result.res_status != nvOS_SUCCESS) {
++		if (result.res_status != nvOS_SUCCESS) {
++			VLOG_ERR("error modifying rule %s\n", result.res_msg);
++		} else {
++			VLOG_ERR("error modifying rule\n");
++		}
++		REVERT_FLOW_FIELDS();
++		goto failed_update;
++	}
++	if (vflow_action_is_to_cpu_action(rule->vflow.vflow_action)) {
++		err = nv_start_vflow_thread(rule);
++		if (err) {
++			REVERT_FLOW_FIELDS();
++			goto do_backout;
++		}
++	}
++
++	do_nv_disconnect(&io);
++	return;
++
++	/*
++	 * Messy, but reduces code duplication
++	 * REVERT_FLOW_FIELDS should have been called before now
++	 */
++do_backout:
++	mod_fields = nv_fields_none;
++	if (NV_FIELDS_TEST(rule->fields, nvc_vflow_action)) {
++		NV_FIELDS_SET(mod_fields, nvc_vflow_action);
++	}
++	if (NV_FIELDS_TEST(rule->fields, nvc_vflow_arg)) {
++		NV_FIELDS_SET(mod_fields, nvc_vflow_arg);
++	}
++	NV_FIELDS_SET(mod_fields, nvc_vflow_name);
++	err = nvc_update_vflow(&io, mod_fields, &rule->vflow, &result);
++	if (err || (result.res_code != nvOS_SUCCESS)) {
++		/*
++		 * This is really bad. If we return error,
++		 * we are supposed to back out all changes.
++		 * If we hit this, we have failed to do that.
++		 * This leaves ovs and nvOSd in inconsistent
++		 * states.
++		 */
++		VLOG_ERR("Failed to restore old rule\n");
++		if (!err) {
++			VLOG_ERR("%s\n", result.res_msg);
++		}
++		do_nv_disconnect(&io);
++		abort();
++	}
++
++	/* REVERT_FLOW_FIELDS should have been called before now */
++failed_update:
++	if (vflow_action_is_to_cpu_action(rule->vflow.vflow_action)) {
++		err = nv_start_vflow_thread(rule);
++		if (err) {
++			VLOG_ERR("Failed to restore old rule state\n");
++			do_nv_disconnect(&io);
++			abort();
++		}
++	}
++	do_nv_disconnect(&io);
++#undef REVERT_FLOW_FIELDS
++}
++#endif
++
++static void
++do_nv_rule_delete(rule_nvos_t *rule)
++{
++	nvOS_result_t result;
++	int err;
++	nvOS_io_t io;
++	nv_fields_t nv_flds = nv_fields_none;
++
++
++	err = do_nv_connect(&io);
++	if (err) {
++		VLOG_ERR("Error connecting to nvOSd\n");
++		return;
++	}
++	NV_FIELDS_SET(nv_flds, nvc_vflow_name);
++	err = nvc_delete_vflow(&io, nv_flds, &rule->vflow, &result);
++	if (err) {
++		VLOG_ERR("error deleting rule\n");
++		do_nv_disconnect(&io);
++		return;
++	}
++	if (result.res_status != nvOS_SUCCESS) {
++		VLOG_ERR("error deleting rule: %s\n", result.res_msg);
++		do_nv_disconnect(&io);
++		return;
++	}
++	do_nv_disconnect(&io);
++}
++
++static void *
++delete_rule_snoop_thread(void *arg)
++{
++	rule_nvos_t *rule = (rule_nvos_t *)arg;
++
++	if (vflow_action_is_to_cpu_action(rule->vflow.vflow_action)) {
++		nv_cancel_snoop(rule);
++	}
++	do_nv_rule_delete(rule);
++	return (NULL);
++}
++
++static void
++nv_rule_delete(struct rule *rule_)
++    OVS_REQUIRES(ofproto_mutex)
++{
++	rule_nvos_t	*rule = (rule_nvos_t *)rule_;
++	int		err;
++
++	VLOG_INFO("nv_rule_delete %s\n", rule->vflow.vflow_name);
++	err = nv_pthread_create_async(delete_rule_snoop_thread, (void *)rule);
++	assert(err == 0);
++}
++
++static void
++rule_expire(rule_nvos_t *rule)
++    OVS_REQUIRES(ofproto_mutex)
++{
++	uint16_t idle_timeout, hard_timeout;
++	long long int now = time_msec();
++	int reason;
++
++	/* Has 'rule' expired? */
++	ovs_mutex_lock(&rule->up.mutex);
++	hard_timeout = rule->up.hard_timeout;
++	idle_timeout = rule->up.idle_timeout;
++	if (hard_timeout && now > rule->up.modified + hard_timeout * 1000) {
++		reason = OFPRR_HARD_TIMEOUT;
++	} else if (idle_timeout && now > rule->used +
++	    idle_timeout * 1000) {
++		reason = OFPRR_IDLE_TIMEOUT;
++	} else {
++		reason = -1;
++	}
++	ovs_mutex_unlock(&rule->up.mutex);
++
++	if (reason >= 0) {
++		VLOG_INFO("Expiring rule %s\n", rule->vflow.vflow_name);
++		ofproto_rule_expire(&rule->up, reason);
++	}
++}
++
++
++static int
++nv_run(struct ofproto *ofproto_)
++{
++	struct rule *rule, *next_rule;
++	ofproto_nvos_t *ofproto = (ofproto_nvos_t *)ofproto_;
++
++	/*
++	 * Expire OpenFlow flows whose idle_timeout or hard_timeout
++	 * has passed.
++	 */
++	ovs_mutex_lock(&ofproto_mutex);
++	LIST_FOR_EACH_SAFE(rule, next_rule, expirable,
++	    &ofproto->up.expirable) {
++		get_vflow_stats((rule_nvos_t *)rule);
++		rule_expire((rule_nvos_t *)rule);
++	}
++	ovs_mutex_unlock(&ofproto_mutex);
++	return (0);
++}
++
++static void
++nv_wait(struct ofproto *ofproto OVS_UNUSED)
++{
++	/* Nothing needs to happen here */
++}
++
++static const char *
++nv_port_open_type(const char *datapath_type OVS_UNUSED, const char *port_type)
++{
++	VLOG_INFO("%s datapath %s port %s\n", __func__, datapath_type,
++	    port_type);
++	if (strcmp(port_type, "system") == 0) {
++		return ("nvos-system");
++	} else if (strcmp(port_type, "internal") == 0) {
++		return ("nvos-internal");
++	} else if (strcmp(port_type, "tap") == 0) {
++		return ("nvos-tap");
++	}
++	return (port_type);
++}
++
++static int
++nv_type_run(const char *type OVS_UNUSED)
++{
++	return (0);
++}
++
++static void
++nv_type_wait(const char *type OVS_UNUSED)
++{
++	/* Nothing needs to happen here */
++}
++
++static void
++nv_port_poll_wait(const struct ofproto *ofproto OVS_UNUSED)
++{
++	/* Nothing needs to happen here */
++}
++
++static void
++nv_get_tables(struct ofproto *ofproto OVS_UNUSED,
++    struct ofputil_table_features *features OVS_UNUSED,
++    struct ofputil_table_stats *stats OVS_UNUSED)
++{
++	/* Stubbed for now */
++}
++
++static int
++nv_ofproto_get_vlan(struct ofproto *ofproto)
++{
++	char *endptr, *startptr;
++	int vlan;
++	if (strncmp(ofproto->name, "vlan", strlen("vlan")) != 0) {
++		VLOG_ERR("Bad ofproto name %s\n", ofproto->name);
++		return (0);
++	}
++	if (strlen(ofproto->name) <= strlen("vlan")) {
++		VLOG_ERR("Bad ofproto name %s\n", ofproto->name);
++		return (0);
++	}
++	startptr = ofproto->name + strlen("vlan");
++	vlan = strtoul(startptr, &endptr, 0);
++	if (endptr == startptr) {
++		VLOG_ERR("Bad ofproto name %s\n", ofproto->name);
++		return (0);
++	}
++	return (vlan);
++}
++
++static void
++ofp_recreate_vlan_header(struct dp_packet *packet,
++    nvOS_packet_info_t *info, uint16_t vlan)
++{
++	nv_ether_header_t	*ehp;
++	nv_ether_vlan_header_t	*new_evh;
++	void			*pktdata = dp_packet_data(packet);
++	uint32_t		pktsize = dp_packet_size(packet);
++
++	ehp = (nv_ether_header_t *)dp_packet_data(packet);
++
++	if (ntohs(ehp->ether_type) != VLAN_TPID) {
++
++		/* always add a vlan header */
++		assert(pktsize >= sizeof (nv_ether_vlan_header_t));
++		info->nvOS_pkt_out.nv_po_data_sz = pktsize -
++		    sizeof (nv_ether_header_t) +
++		    sizeof (nv_ether_vlan_header_t);
++
++		new_evh = (nv_ether_vlan_header_t *)
++		    info->nvOS_pkt_out.nv_po_data;
++		new_evh->ether_tpid = htons(VLAN_TPID);
++		new_evh->ether_tci = htons(vlan);
++		memcpy(&new_evh->ether_dhost, &ehp->ether_dhost,
++		    sizeof (ether_addr_t));
++		memcpy(&new_evh->ether_shost, &ehp->ether_shost,
++		    sizeof (ether_addr_t));
++		new_evh->ether_type = ehp->ether_type;
++		memcpy((new_evh + 1), (ehp + 1),
++		    info->nvOS_pkt_out.nv_po_data_sz
++		    - sizeof (nv_ether_vlan_header_t));
++	} else {
++		memcpy(info->nvOS_pkt_out.nv_po_data, pktdata, pktsize);
++	}
++}
++
++static int
++nv_send_packet(struct dp_packet *packet, const struct ofpact *ofpact,
++    ofproto_nvos_t *ofproto)
++{
++	nvOS_packet_info_t *info;
++	nvOS_io_t io;
++	nvOS_connection_t *conn;
++	int err;
++	const char *name;
++	int portno;
++	void *pktdata = dp_packet_data(packet);
++	uint32_t pktsize = dp_packet_size(packet);
++
++	VLOG_INFO("Sending packet **************\n");
++	VLOG_INFO("%s", ofp_packet_to_string(pktdata, pktsize,
++	    packet->packet_type));
++	VLOG_INFO("****************\n\n");
++
++	err = do_nv_connect(&io);
++	if (err) {
++		VLOG_ERR("Failed to connect to "
++		    "nvOSd for send\n");
++		return (OFPERR_OFPHFC_EPERM);
++	}
++	conn = nvc_get_conn(&io);
++	info = malloc(sizeof (nvOS_packet_info_t)
++	    + pktsize + sizeof (nv_ether_vlan_header_t) -
++	    sizeof (nv_ether_header_t));
++	bzero(info, sizeof (*info));
++	ofp_recreate_vlan_header(packet, info,
++	    nv_ofproto_get_vlan(&ofproto->up));
++	info->nvOS_ctl.nvOS_ctl_switch_id = 0;
++	info->nvOS_pkt_out.nv_po_is_logical = B_FALSE;
++	info->nvOS_pkt_out.nv_po_vlan =
++	    nv_ofproto_get_vlan(&ofproto->up);
++	if (ofpact_get_OUTPUT(ofpact)->port ==
++	    OFPP_FLOOD) {
++		SSET_FOR_EACH(name, &ofproto->ports) {
++			portno =
++			    nv_netdev_get_portno(name);
++			info->nvOS_pkt_out.nv_po_port =
++			    portno;
++			err =
++			    nvOS_send_packet_out(conn, info);
++			VLOG_INFO("Sending flood packet "
++			    "port %s\n",
++			    name);
++		}
++	} else {
++		info->nvOS_pkt_out.nv_po_port =
++		    ofpact_get_OUTPUT(ofpact)->port;
++		VLOG_INFO("Sending packet port %i\n",
++		    ofpact_get_OUTPUT(ofpact)->port);
++		err = nvOS_send_packet_out(conn, info);
++	}
++	if (err) {
++		VLOG_INFO("Failed to send packet\n");
++		free(info);
++		do_nv_disconnect(&io);
++		return (OFPERR_OFPHFC_EPERM);
++	}
++	free(info);
++	do_nv_disconnect(&io);
++	return (0);
++
++}
++
++static void
++nv_packet_out(struct ofproto *ofproto_, struct ofproto_packet_out *opo)
++{
++	const struct ofpact *ofpact;
++	ofproto_nvos_t *ofproto = ofproto_nvos_cast(ofproto_);
++
++	OFPACT_FOR_EACH(ofpact, opo->ofpacts, opo->ofpacts_len) {
++		if (ofpact->type == OFPACT_OUTPUT) {
++			nv_send_packet(opo->packet, ofpact, ofproto);
++		} else {
++			return;
++		}
++	}
++	return;
++}
++
++const struct ofproto_class ofproto_nvos_class = {
++	nv_init,
++	nv_enumerate_types,
++	nv_enumerate_names,
++	nv_del,
++	nv_port_open_type,
++	nv_type_run,
++	nv_type_wait,
++	nv_alloc,
++	nv_construct,
++	nv_destruct,
++	nv_dealloc,
++	nv_run,
++	nv_wait,
++	NULL, /* get_memory_usage */
++	NULL, /* type_get_memory_usage */
++	NULL, /* flush */
++	nv_get_tables,
++	NULL, /* modify_tables */
++	NULL, /* set_tables_version */
++	nv_port_alloc,
++	nv_port_construct,
++	nv_port_destruct,
++	nv_port_dealloc,
++	NULL, // nv_port_modified,
++	NULL, // nv_port_reconfigured,
++	nv_port_query_by_name,
++	nv_port_add,
++	nv_port_del,
++	NULL,
++	nv_port_get_stats,
++	NULL, /* vport_get_status */
++	nv_port_dump_start,
++	nv_port_dump_next,
++	nv_port_dump_done,
++	NULL, // nv_port_poll,
++	nv_port_poll_wait,
++	NULL, /* port_is_lacp_current */
++	NULL, /* port_get_lacp_stats */
++	NULL, /* rule_choose_table */
++	nv_rule_alloc,
++	nv_rule_construct,
++	nv_rule_insert,
++	nv_rule_delete,
++	nv_rule_destruct,
++	nv_rule_dealloc,
++	nv_rule_get_stats,
++	// nv_rule_execute, /* No packet buffering and hence needs rework */
++	NULL, // packet_xlate
++	NULL, // packet_xlate_revert
++	NULL, // packet_execute_prepare
++	nv_packet_out, // packet_execute
++	NULL, // set_frag_handling
++	NULL, /* nxt_resume */
++	NULL, /* set_netflow */
++	NULL, /* get_netflow_ids */
++	NULL, /* set_sflow */
++	NULL, /* set_ipfix */
++	NULL, /* get_ipfix_stats */
++	NULL, /* set_cfm */
++	NULL, /* cfm_status_changed */
++	NULL, /* get_cfm_status */
++	NULL, /* set_lldp */
++	NULL, /* get_lldp_status */
++	NULL, /* set_aa */
++	NULL, /* aa_mapping_set */
++	NULL, /* aa_mapping_unset */
++	NULL, /* aa_vlan_get_queued */
++	NULL, /* aa_vlan_get_queue_size */
++	NULL, /* set_bfd */
++	NULL, /* bfd_status_changed */
++	NULL, /* get_bfd_status */
++	NULL, /* set_stp */
++	NULL, /* get_stp_status */
++	NULL, /* set_stp_port */
++	NULL, /* get_stp_port_status */
++	NULL, /* get_stp_port_stats */
++	NULL, /* set_rstp */
++	NULL, /* get_rstp_status */
++	NULL, /* set_rstp_port */
++	NULL, /* get_rstp_port_status */
++	NULL, /* set_queues */
++	NULL, /* bundle_set */
++	NULL, /* bundle_remove */
++	NULL, /* mirror_set */
++	NULL, /* mirror_get_stats */
++	NULL, /* set_flood_vlans */
++	NULL, /* is_mirror_output_bundle */
++	NULL, /* forward_bpdu_changed */
++	NULL, /* set_mac_table_config */
++	NULL, /* set_mcast_snooping */
++	NULL, /* set_mcast_snooping_port */
++//	NULL, /* set_realdev */
++	NULL, /* meter_get_features */
++	NULL, /* meter_set */
++	NULL, /* meter_get */
++	NULL, /* meter_del */
++	NULL, /* group_alloc */
++	NULL, /* group_construct */
++	NULL, /* group_destruct */
++	NULL, /* group_dealloc */
++	NULL, /* group_modify */
++	NULL, /* group_get_stats */
++	NULL, /* get_datapath_version */
++	NULL, /* get_datapath_cap */
++	NULL, /* type_set_config */
++	NULL, /* ct_flush */
++	NULL, /* ct_set_zone_timeout_policy */
++	NULL, /* ct_del_zone_timeout_policy */
++};
+diff -uNr openvswitch-2.15.0/ofproto/ofproto-provider.h openvswitch-2.15.0-new/ofproto/ofproto-provider.h
+--- openvswitch-2.15.0/ofproto/ofproto-provider.h	2021-02-15 10:24:17.771074628 -0800
++++ openvswitch-2.15.0-new/ofproto/ofproto-provider.h	2021-05-11 06:55:27.393936257 -0700
+@@ -1908,6 +1908,9 @@
+ };
+ 
+ extern const struct ofproto_class ofproto_dpif_class;
++#if defined(PLURIBUS) && defined(NVOS)
++extern const struct ofproto_class ofproto_nvos_class;
++#endif
+ 
+ int ofproto_class_register(const struct ofproto_class *);
+ int ofproto_class_unregister(const struct ofproto_class *);
+diff -uNr openvswitch-2.15.0/ofproto/ofproto.c openvswitch-2.15.0-new/ofproto/ofproto.c
+--- openvswitch-2.15.0/ofproto/ofproto.c	2021-02-15 10:24:17.773074628 -0800
++++ openvswitch-2.15.0-new/ofproto/ofproto.c	2021-05-11 04:50:05.163212058 -0700
+@@ -2658,7 +2658,9 @@
+             return;
+         }
+     }
++#if !defined(PLURIBUS)
+     ovs_assert(last_used == LLONG_MAX);
++#endif
+ 
+     usage = xmalloc(sizeof *usage);
+     usage->ofp_port = ofp_port;

@@ -1,0 +1,15 @@
+--- ./net-snmp-5.8/agent/mibgroup/ucd-snmp/disk.c	2017-08-07 11:48:49.935504659 -0700
++++ ./net-snmp-5.8/agent/mibgroup/ucd-snmp/disk.c	2017-08-07 11:45:50.095509505 -0700
+@@ -737,9 +737,9 @@
+     entry->dskPercent = 
+         vfs.f_blocks == 0 ? 0 :
+         vfs.f_bavail <= 0 ? 100 :
+-        (int) ((double) (vfs.f_blocks - vfs.f_bfree) /
+-               (double) (vfs.f_blocks -
+-                         (vfs.f_bfree - vfs.f_bavail)) * 100.0 + 0.5);
++        (int) ((double) (vfs.f_blocks * vfs.f_frsize) /
++               (double) (vfs.f_bavail * vfs.f_bsize + 
++                         vfs.f_blocks * vfs.f_frsize) * 100.0);
+ 
+ #if defined(HAVE_STRUCT_STATVFS_F_FILES) || defined HAVE_STRUCT_STATFS_F_FAVAIL
+     entry->dskPercentInode = vfs.f_favail <= 0 ? 100 :

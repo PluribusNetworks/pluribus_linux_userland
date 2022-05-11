@@ -1,0 +1,23 @@
+--- a/net-snmp-5.8/snmplib/transports/snmpUnixDomain.c.orig	2017-09-28 22:49:41.073027879 -0700
++++ b/net-snmp-5.8/snmplib/transports/snmpUnixDomain.c	2017-09-28 22:49:15.289027664 -0700
+@@ -168,7 +168,20 @@
+         DEBUGMSGTL(("netsnmp_unix", "send %d bytes to %p on fd %d\n",
+                     size, buf, t->sock));
+         while (rc < 0) {
++#if defined(sun) && defined(__sun)
++            struct sigaction act, oact;
++
++            /*
++             * On Solaris we do not have MSG_NOSIGNAL. So we have to
++             * temporarily disable SIGPIPE before calling sendto.
++             */
++            act.sa_handler = SIG_IGN;
++            sigaction(SIGPIPE, &act, &oact);
+             rc = sendto(t->sock, buf, size, 0, NULL, 0);
++            sigaction(SIGPIPE, &oact, NULL);
++#else
++            rc = sendto(t->sock, buf, size, MSG_NOSIGNAL, NULL, 0);
++#endif
+             if (rc < 0 && errno != EINTR) {
+                 break;
+             }

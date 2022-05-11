@@ -1,0 +1,18 @@
+--- ./net-snmp-5.8/agent/mibgroup/kernel_sunos5.c	Mon Nov 18 18:10:34 2013
++++ ./net-snmp-5.8/agent/mibgroup/kernel_sunos5.c	Mon Nov 18 18:11:20 2013
+@@ -35,6 +35,7 @@
+ #include <stdlib.h>
+ #include <unistd.h>
+ #include <string.h>
++#include <sys/debug.h>
+ 
+ /*-
+  * Includes of system header files (wrapped in duplicate include prevention)
+@@ -839,6 +839,7 @@
+     if (cp->cache_size) {
+ 	cp->cache_addr = malloc(cp->cache_size);
+     }
++    ASSERT(cp->cache_addr != NULL);
+     cp->cache_time = 0;
+     cp->cache_comp = NULL;
+     cp->cache_arg = NULL;

@@ -1,0 +1,69 @@
+Bug 16573 - SNMP should report "available memory" instead of "free memory" as part of system memory usage numbers
+Bug 19109 - Net-SNMP incorrectly reports free memory (includes the OS ZFS cache)
+
+=====================================================================
+--- ./net-snmp-5.8/agent/mibgroup/hardware/memory/memory_linux.c.orig   Wed Jun 14 23:12:45 2017
++++ ./net-snmp-5.8/agent/mibgroup/hardware/memory/memory_linux.c        Wed Jun 14 23:13:46 2017
+@@ -84,12 +84,12 @@
+         if (first)
+             snmp_log(LOG_ERR, "No MemTotal line in /proc/meminfo\n");
+     }
+-    b = strstr(buff, "MemFree: ");
++    b = strstr(buff, "MemAvailable: ");
+     if (b) 
+-        sscanf(b, "MemFree: %lu", &memfree);
++        sscanf(b, "MemAvailable: %lu", &memfree);
+     else {
+         if (first)
+-            snmp_log(LOG_ERR, "No MemFree line in /proc/meminfo\n");
++            snmp_log(LOG_ERR, "No MemAvailable line in /proc/meminfo\n");
+     }
+     if (0 == netsnmp_os_prematch("Linux","2.4")) {
+         b = strstr(buff, "MemShared: ");
+--- ./net-snmp-5.8/agent/mibgroup/hardware/memory/memory_solaris.c.orig	Wed Jan 31 07:48:51 2018
++++ ./net-snmp-5.8/agent/mibgroup/hardware/memory/memory_solaris.c	Wed Jan 31 07:51:02 2018
+@@ -20,11 +20,9 @@
+      */
+ int netsnmp_mem_arch_load( netsnmp_cache *cache, void *magic ) {
+ 
+-#ifndef _SC_PHYS_PAGES
+     extern kstat_ctl_t *kstat_fd;   /* defined in kernel_sunos5.c */
+     kstat_t        *ksp1;
+     kstat_named_t  *kn;
+-#endif
+ #ifdef SC_AINFO
+     struct anoninfo ai;
+ #endif
+@@ -34,6 +32,8 @@
+     long   swap_pages = 0;
+     long   swap_free  = 0;
+     long   pagesize   = 0;
++    long   arc_min    = 0;
++    long   arc_size   = 0;
+     netsnmp_memory_info *mem;
+ 
+     /*
+@@ -60,6 +60,23 @@
+ #endif
+ 
+     /*
++     * Some sysadmins do not seem to understand evictable ZFS ARC so
++     * add it to phys_free here to make it look like "free" mem.
++     * Linux exposes a metric called "Available Memory" for the same
++     * purpose but no equivalent exists on Solaris.
++     */
++    ksp1 = kstat_lookup(kstat_fd, "zfs", 0, "arcstats");
++    kstat_read(kstat_fd, ksp1, 0);
++    kn = kstat_data_lookup(ksp1, "c_min");
++    arc_min = kn->value.ull / pagesize;
++    kn = kstat_data_lookup(ksp1, "size");
++    arc_size = kn->value.ull / pagesize;
++
++    if (arc_size > arc_min) {
++        phys_free = phys_free + arc_size - arc_min;
++    }
++
++    /*
+      * ... and save this in a standard form.
+      */
+     mem = netsnmp_memory_get_byIdx( NETSNMP_MEM_TYPE_PHYSMEM, 1 );

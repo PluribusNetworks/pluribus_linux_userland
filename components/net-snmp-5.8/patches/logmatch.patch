@@ -1,0 +1,38 @@
+--- ./net-snmp-5.8/agent/mibgroup/ucd-snmp/logmatch.c	Mon Dec  8 12:23:22 2014
++++ ./net-snmp-5.8/agent/mibgroup/ucd-snmp/logmatch.c	Mon Dec  8 12:23:22 2014
+@@ -92,6 +92,7 @@
+     int             virgin;
+     int             thisIndex;
+     int             frequency;
++    int		    alarm_id;
+ };
+ 
+ #define MAXLOGMATCH   250
+@@ -358,6 +359,7 @@
+     char space_path;
+ 
+     if (logmatchCount < MAXLOGMATCH) {
++	bzero(&logmatchTable[logmatchCount], sizeof (logmatchTable[logmatchCount]));
+         logmatchTable[logmatchCount].frequency = 30;
+         logmatchTable[logmatchCount].thisIndex = logmatchCount;
+ 
+@@ -446,7 +448,7 @@
+                      logmatchTable[logmatchCount].regEx, regexErrorString);
+         }
+         else if (logmatchTable[logmatchCount].frequency > 0) {
+-            snmp_alarm_register(logmatchTable[logmatchCount].frequency,
++            logmatchTable[logmatchCount].alarm_id = snmp_alarm_register(logmatchTable[logmatchCount].frequency,
+                                 SA_REPEAT,
+                                 (SNMPAlarmCallback *) updateLogmatch_Scheduled,
+                                 &logmatchTable[logmatchCount]);
+@@ -478,6 +480,10 @@
+     for (i = 0; i < logmatchCount; i++) {
+         if (logmatchTable[i].myRegexError == 0)
+             regfree(&logmatchTable[i].regexBuffer);
++	 	if (logmatchTable[i].alarm_id != 0) {
++	 		snmp_alarm_unregister(logmatchTable[i].alarm_id);
++			logmatchTable[i].alarm_id = 0;
++	 	}
+     }
+     logmatchCount = 0;
+ }

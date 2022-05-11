@@ -1,0 +1,76 @@
+--- ./net-snmp-5.8/agent/agent_trap.c	Fri Aug 18 08:40:10 2017
++++ ./net-snmp-5.8/agent/agent_trap.c	Fri Aug 18 08:40:31 2017
+@@ -113,6 +113,7 @@
+ #define SNMP_AUTHENTICATED_TRAPS_DISABLED	2
+ 
+ long            snmp_enableauthentraps = SNMP_AUTHENTICATED_TRAPS_DISABLED;
++long            snmp_startstoptrapenable = 1;
+ int             snmp_enableauthentrapsset = 0;
+ 
+ /*
+@@ -639,6 +640,16 @@
+     DEBUGMSGOID(("trap", enterprise, enterprise_length));
+     DEBUGMSG(( "trap", "\n"));
+ 
++    /*
++     * If cold start, warm start or shutdown traps and those are disabled
++     * then exit early.
++     */
++    if (((trap == SNMP_TRAP_ENTERPRISESPECIFIC &&
++        (specific == 2 || specific == 3)) ||
++        (trap == 0 && specific == 0)) && snmp_startstoptrapenable == 2) {
++        return 0;
++    }
++
+     if (vars) {
+         vblist = snmp_clone_varbind( vars );
+         if (!vblist) {
+@@ -1076,7 +1087,26 @@
+ 	 * Config file handling
+ 	 *
+ 	 *******************/
++void
++snmpd_parse_config_startstop(const char *token, char *cptr)
++{
++    int             i;
+ 
++    i = atoi(cptr);
++    if (i == 0) {
++        if (strcmp(cptr, "enable") == 0) {
++            i = 1;
++        } else if (strcmp(cptr, "disable") == 0) {
++            i = 2;
++        }
++    }
++    if (i < 1 || i > 2) {
++        config_perror("startstoptrapenable must be 1 or 2");
++    } else {
++        snmp_startstoptrapenable = i;
++    }
++}
++
+ void
+ snmpd_parse_config_authtrap(const char *token, char *cptr)
+ {
+--- ./net-snmp-5.8/agent/agent_read_config.c	Fri Aug 18 08:41:01 2017
++++ net-snmp-5.8/agent/agent_read_config.c	Fri Aug 18 08:42:23 2017
+@@ -215,6 +215,9 @@
+                                 "1 | 2\t\t(1 = enable, 2 = disable)");
+     register_app_config_handler("pauthtrapenable",
+                                 snmpd_parse_config_authtrap, NULL, NULL);
++    register_app_config_handler("startstoptrapenable",
++                                snmpd_parse_config_startstop, NULL,
++                                "1 | 2\t\t(1 = enable, 2 = disable)");
+ 
+ 
+     if (netsnmp_ds_get_boolean(NETSNMP_DS_APPLICATION_ID, 
+--- ./net-snmp-5.8/include/net-snmp/agent/agent_trap.h	Fri Aug 18 08:43:04 2017
++++ net-snmp-5.8/include/net-snmp/agent/agent_trap.h	Fri Aug 18 08:43:11 2017
+@@ -29,6 +29,7 @@
+                           /* flags are currently unused */
+                           const char * context, int flags);
+ void            snmpd_parse_config_authtrap(const char *, char *);
++void            snmpd_parse_config_startstop(const char *, char *);
+ void            snmpd_parse_config_trapsink(const char *, char *);
+ void            snmpd_parse_config_trap2sink(const char *, char *);
+ void            snmpd_parse_config_informsink(const char *, char *);

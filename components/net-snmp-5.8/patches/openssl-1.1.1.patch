@@ -1,0 +1,31 @@
+diff -u -r net-snmp-5.8/snmplib/snmp_openssl.c net-snmp-5.8.new/snmplib/snmp_openssl.c
+--- net-snmp-5.8/snmplib/snmp_openssl.c	2021-06-22 09:51:53.850904545 -0700
++++ net-snmp-5.8/snmplib/snmp_openssl.c	2021-06-22 22:06:36.631619187 -0700
+@@ -127,7 +127,6 @@
+     SSL_load_error_strings();
+ #endif
+     ERR_load_BIO_strings();
+-    OpenSSL_add_all_algorithms();
+ }
+ 
+ /** netsnmp_openssl_cert_get_name: get subject name field from cert
+@@ -687,7 +686,7 @@
+ 
+     /** check for a chain to a CA */
+     ochain = SSL_get_peer_cert_chain(ssl);
+-    if ((NULL == ochain) || (0 == sk_num((const void *)ochain))) {
++    if ((NULL == ochain) || (0 == OPENSSL_sk_num((const void *)ochain))) {
+         DEBUGMSGT(("ssl:cert:chain", "peer has no cert chain\n"));
+     }
+     else {
+@@ -695,8 +694,8 @@
+          * loop over chain, adding fingerprint / cert for each
+          */
+         DEBUGMSGT(("ssl:cert:chain", "examining cert chain\n"));
+-        for(i = 0; i < sk_num((const void *)ochain); ++i) {
+-            ocert_tmp = (X509*)sk_value((const void *)ochain,i);
++        for(i = 0; i < OPENSSL_sk_num((const void *)ochain); ++i) {
++            ocert_tmp = (X509*)OPENSSL_sk_value((const void *)ochain,i);
+             fingerprint = netsnmp_openssl_cert_get_fingerprint(ocert_tmp,
+                                                                NS_HASH_SHA1);
+             if (NULL == fingerprint)

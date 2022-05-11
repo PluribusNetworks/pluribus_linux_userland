@@ -1,0 +1,13 @@
+--- a/net-snmp-5.8/snmplib/container.c	2014-12-08 20:23:22.000000000 +0000
++++ b/net-snmp-5.8/snmplib/container.c	2015-12-16 14:40:40.059768508 +0000
+@@ -325,8 +325,8 @@
+     if(x) {
+         int rc = x->insert(x,k);
+         if(rc)
+-            snmp_log(LOG_DEBUG,"error on subcontainer '%s' insert (%d)\n",
+-                     x->container_name ? x->container_name : "", rc);
++            DEBUGMSGTL(("container:insert_helper", "error on subcontainer '%s' insert (%d)\n",
++                     x->container_name ? x->container_name : "", rc));
+         else {
+             rc = CONTAINER_INSERT_HELPER(x->next, k);
+             if(rc)

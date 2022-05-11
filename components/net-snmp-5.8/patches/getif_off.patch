@@ -1,0 +1,11 @@
+--- ./net-snmp-5.8/agent/mibgroup/kernel_sunos5.c	Tue Nov 19 13:11:03 2013
++++ ./net-snmp-5.8/agent/mibgroup/kernel_sunos5.c	Tue Nov 19 13:14:59 2013
+@@ -1373,6 +1373,8 @@
+     uint64_t        if_flags;    
+     struct if_nameindex *ifname, *ifnp;
+ 
++    return -1;
++
+     lifrp = &lifreq; 
+ 
+     if ((ifsd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
